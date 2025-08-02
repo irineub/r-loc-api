@@ -1,0 +1,303 @@
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
+from typing import List, Optional
+from datetime import datetime, timedelta
+from app import models, schemas
+from app.models import StatusOrcamento, StatusLocacao
+from app.models import Equipamento
+from app.schemas import EquipamentoCreate, EquipamentoUpdate
+
+# Cliente CRUD
+def get_cliente(db: Session, cliente_id: int):
+    return db.query(models.Cliente).filter(models.Cliente.id == cliente_id).first()
+
+def get_clientes(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Cliente).offset(skip).limit(limit).all()
+
+def create_cliente(db: Session, cliente: schemas.ClienteCreate):
+    db_cliente = models.Cliente(**cliente.dict())
+    db.add(db_cliente)
+    db.commit()
+    db.refresh(db_cliente)
+    return db_cliente
+
+def update_cliente(db: Session, cliente_id: int, cliente: schemas.ClienteUpdate):
+    db_cliente = get_cliente(db, cliente_id)
+    if db_cliente:
+        update_data = cliente.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_cliente, field, value)
+        db.commit()
+        db.refresh(db_cliente)
+    return db_cliente
+
+def delete_cliente(db: Session, cliente_id: int):
+    db_cliente = get_cliente(db, cliente_id)
+    if db_cliente:
+        db.delete(db_cliente)
+        db.commit()
+    return db_cliente
+
+# Equipamento CRUD
+def get_equipamento(db: Session, equipamento_id: int):
+    return db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+
+def get_equipamentos(db: Session, skip: int = 0, limit: int = 100):
+    equipamentos = db.query(models.Equipamento).offset(skip).limit(limit).all()
+    return equipamentos
+
+def create_equipamento(db: Session, equipamento: schemas.EquipamentoCreate):
+    db_equipamento = models.Equipamento(**equipamento.dict())
+    db.add(db_equipamento)
+    db.commit()
+    db.refresh(db_equipamento)
+    return db_equipamento
+
+def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.EquipamentoUpdate):
+    db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+    if db_equipamento:
+        for key, value in equipamento.dict(exclude_unset=True).items():
+            setattr(db_equipamento, key, value)
+        db.commit()
+        db.refresh(db_equipamento)
+    return db_equipamento
+
+def delete_equipamento(db: Session, equipamento_id: int):
+    db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+    if db_equipamento:
+        db.delete(db_equipamento)
+        db.commit()
+    return db_equipamento
+
+def update_equipamento_stock(db: Session, equipamento_id: int, quantidade_alugada: int):
+    db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+    if db_equipamento:
+        db_equipamento.estoque_alugado += quantidade_alugada
+        db.commit()
+        db.refresh(db_equipamento)
+    return db_equipamento
+
+def alugar_equipamento(db: Session, equipamento_id: int, quantidade: int):
+    db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+    if not db_equipamento:
+        raise ValueError("Equipamento não encontrado")
+    
+    estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+    if estoque_disponivel < quantidade:
+        raise ValueError(f"Estoque insuficiente. Disponível: {estoque_disponivel}, Solicitado: {quantidade}")
+    
+    db_equipamento.estoque_alugado += quantidade
+    db.commit()
+    db.refresh(db_equipamento)
+    return db_equipamento
+
+def devolver_equipamento(db: Session, equipamento_id: int, quantidade: int):
+    db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
+    if not db_equipamento:
+        raise ValueError("Equipamento não encontrado")
+    
+    if db_equipamento.estoque_alugado < quantidade:
+        raise ValueError(f"Quantidade a devolver ({quantidade}) maior que quantidade alugada ({db_equipamento.estoque_alugado})")
+    
+    db_equipamento.estoque_alugado -= quantidade
+    db.commit()
+    db.refresh(db_equipamento)
+    return db_equipamento
+
+# Orcamento CRUD
+def get_orcamento(db: Session, orcamento_id: int):
+    return db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
+
+def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Optional[int] = None):
+    query = db.query(models.Orcamento)
+    if cliente_id:
+        query = query.filter(models.Orcamento.cliente_id == cliente_id)
+    return query.offset(skip).limit(limit).all()
+
+def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
+    """Get only approved orcamentos from database"""
+    return db.query(models.Orcamento).filter(
+        models.Orcamento.status == "aprovado"
+    ).offset(skip).limit(limit).all()
+
+def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
+    # Create orcamento
+    orcamento_data = orcamento.dict(exclude={'itens'})
+    db_orcamento = models.Orcamento(**orcamento_data)
+    db.add(db_orcamento)
+    db.commit()
+    db.refresh(db_orcamento)
+    
+    # Create itens
+    for item in orcamento.itens:
+        db_item = models.ItemOrcamento(**item.dict(), orcamento_id=db_orcamento.id)
+        db.add(db_item)
+    
+    db.commit()
+    db.refresh(db_orcamento)
+    return db_orcamento
+
+def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.OrcamentoUpdate):
+    db_orcamento = get_orcamento(db, orcamento_id)
+    if db_orcamento:
+        update_data = orcamento.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_orcamento, field, value)
+        db.commit()
+        db.refresh(db_orcamento)
+    return db_orcamento
+
+def aprovar_orcamento(db: Session, orcamento_id: int):
+    db_orcamento = get_orcamento(db, orcamento_id)
+    if db_orcamento and db_orcamento.status == StatusOrcamento.PENDENTE:
+        db_orcamento.status = StatusOrcamento.APROVADO
+        db.commit()
+        db.refresh(db_orcamento)
+    return db_orcamento
+
+def rejeitar_orcamento(db: Session, orcamento_id: int):
+    db_orcamento = get_orcamento(db, orcamento_id)
+    if db_orcamento and db_orcamento.status == StatusOrcamento.PENDENTE:
+        db_orcamento.status = StatusOrcamento.REJEITADO
+        db.commit()
+        db.refresh(db_orcamento)
+    return db_orcamento
+
+# Locacao CRUD
+def get_locacao(db: Session, locacao_id: int):
+    return db.query(models.Locacao).filter(models.Locacao.id == locacao_id).first()
+
+def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[StatusLocacao] = None):
+    query = db.query(models.Locacao)
+    if status:
+        query = query.filter(models.Locacao.status == status)
+    return query.offset(skip).limit(limit).all()
+
+def create_locacao_from_orcamento(db: Session, orcamento_id: int):
+    # Buscar o orçamento
+    orcamento = db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
+    if not orcamento:
+        raise ValueError("Orçamento não encontrado")
+    
+    if orcamento.status != "aprovado":
+        raise ValueError("Apenas orçamentos aprovados podem gerar locações")
+    
+    # Verificar se já existe uma locação para este orçamento
+    existing_locacao = db.query(models.Locacao).filter(models.Locacao.orcamento_id == orcamento_id).first()
+    if existing_locacao:
+        raise ValueError("Já existe uma locação para este orçamento")
+    
+    # Criar a locação
+    locacao_data = {
+        "orcamento_id": orcamento_id,
+        "cliente_id": orcamento.cliente_id,
+        "data_inicio": orcamento.data_inicio,
+        "data_fim": orcamento.data_fim,
+        "total_final": orcamento.total_final,
+        "status": "ativa"
+    }
+    
+    db_locacao = models.Locacao(**locacao_data)
+    db.add(db_locacao)
+    db.commit()
+    db.refresh(db_locacao)
+    
+    # Criar itens da locação baseados nos itens do orçamento
+    for item_orcamento in orcamento.itens:
+        equipamento = get_equipamento(db, item_orcamento.equipamento_id)
+        if not equipamento:
+            raise ValueError(f"Equipamento {item_orcamento.equipamento_id} não encontrado")
+        
+        # Verificar disponibilidade
+        estoque_disponivel = equipamento.estoque - equipamento.estoque_alugado
+        if estoque_disponivel < item_orcamento.quantidade:
+            raise ValueError(f"Estoque insuficiente para {equipamento.descricao}. Disponível: {estoque_disponivel}, Solicitado: {item_orcamento.quantidade}")
+        
+        # Criar item da locação
+        item_locacao_data = {
+            "locacao_id": db_locacao.id,
+            "equipamento_id": item_orcamento.equipamento_id,
+            "quantidade": item_orcamento.quantidade,
+            "preco_unitario": item_orcamento.preco_unitario,
+            "dias": item_orcamento.dias,
+            "subtotal": item_orcamento.subtotal
+        }
+        
+        db_item_locacao = models.ItemLocacao(**item_locacao_data)
+        db.add(db_item_locacao)
+        
+        # Atualizar estoque do equipamento
+        equipamento.estoque_alugado += item_orcamento.quantidade
+    
+    db.commit()
+    return db_locacao
+
+def update_locacao(db: Session, locacao_id: int, locacao: schemas.LocacaoUpdate):
+    db_locacao = get_locacao(db, locacao_id)
+    if db_locacao:
+        update_data = locacao.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(db_locacao, field, value)
+        db.commit()
+        db.refresh(db_locacao)
+    return db_locacao
+
+def finalizar_locacao(db: Session, locacao_id: int):
+    """Finaliza uma locação e devolve os equipamentos ao estoque"""
+    locacao = get_locacao(db, locacao_id=locacao_id)
+    if not locacao:
+        raise ValueError("Locação não encontrada")
+    
+    if locacao.status != StatusLocacao.ATIVA:
+        raise ValueError("Apenas locações ativas podem ser finalizadas")
+    
+    # Devolver equipamentos ao estoque
+    for item in locacao.itens:
+        equipamento = get_equipamento(db, item.equipamento_id)
+        if equipamento:
+            equipamento.estoque_alugado -= item.quantidade
+    
+    locacao.status = StatusLocacao.FINALIZADA
+    locacao.data_devolucao = datetime.now()
+    
+    db.commit()
+    return locacao
+
+def cancelar_locacao(db: Session, locacao_id: int):
+    """Cancela uma locação e devolve os equipamentos ao estoque"""
+    locacao = get_locacao(db, locacao_id=locacao_id)
+    if not locacao:
+        raise ValueError("Locação não encontrada")
+    
+    if locacao.status != StatusLocacao.ATIVA:
+        raise ValueError("Apenas locações ativas podem ser canceladas")
+    
+    # Devolver equipamentos ao estoque
+    for item in locacao.itens:
+        equipamento = get_equipamento(db, item.equipamento_id)
+        if equipamento:
+            equipamento.estoque_alugado -= item.quantidade
+    
+    locacao.status = StatusLocacao.CANCELADA
+    
+    db.commit()
+    return locacao
+
+# Utility functions
+def calcular_dias(data_inicio: datetime, data_fim: datetime) -> int:
+    """Calculate the number of days between two dates"""
+    return (data_fim - data_inicio).days
+
+def calcular_subtotal(quantidade: int, preco_unitario: float, dias: int) -> float:
+    """Calculate the subtotal for an item"""
+    return quantidade * preco_unitario * dias
+
+def get_locacoes_atrasadas(db: Session):
+    """Get all overdue locacoes"""
+    hoje = datetime.now()
+    return db.query(models.Locacao).filter(
+        and_(
+            models.Locacao.status == StatusLocacao.ATIVA,
+            models.Locacao.data_fim < hoje
+        )
+    ).all() 
