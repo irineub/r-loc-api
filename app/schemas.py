@@ -37,7 +37,6 @@ class EquipamentoBase(BaseModel):
     descricao: str
     unidade: str
     preco_unitario: float
-    tipo_cobranca: str
     estoque: int = 1
     estoque_alugado: int = 0
 
@@ -48,7 +47,6 @@ class EquipamentoUpdate(BaseModel):
     descricao: Optional[str] = None
     unidade: Optional[str] = None
     preco_unitario: Optional[float] = None
-    tipo_cobranca: Optional[str] = None
     estoque: Optional[int] = None
 
 class Equipamento(EquipamentoBase):

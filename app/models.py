@@ -53,7 +53,6 @@ class Equipamento(Base):
     descricao = Column(String, nullable=False)
     unidade = Column(String, nullable=False)
     preco_unitario = Column(Float, nullable=False)
-    tipo_cobranca = Column(Enum('diaria', 'mensal', name='tipo_cobranca'), nullable=False)
     estoque = Column(Integer, default=1, nullable=False)  # Quantidade disponível em estoque
     estoque_alugado = Column(Integer, default=0, nullable=False)  # Quantidade atualmente alugada
 
