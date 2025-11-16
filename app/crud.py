@@ -4,8 +4,9 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 from app import models, schemas
 from app.models import StatusOrcamento, StatusLocacao
-from app.models import Equipamento
+from app.models import Equipamento, StatusOrcamento
 from app.schemas import EquipamentoCreate, EquipamentoUpdate
+from typing import Dict
 
 # Cliente CRUD
 def get_cliente(db: Session, cliente_id: int):
@@ -179,7 +180,7 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int):
     if not orcamento:
         raise ValueError("Orçamento não encontrado")
     
-    if orcamento.status != "aprovado":
+    if orcamento.status != StatusOrcamento.APROVADO:
         raise ValueError("Apenas orçamentos aprovados podem gerar locações")
     
     # Verificar se já existe uma locação para este orçamento
@@ -218,6 +219,7 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int):
             "locacao_id": db_locacao.id,
             "equipamento_id": item_orcamento.equipamento_id,
             "quantidade": item_orcamento.quantidade,
+            "quantidade_devolvida": 0,
             "preco_unitario": item_orcamento.preco_unitario,
             "dias": item_orcamento.dias,
             "subtotal": item_orcamento.subtotal
@@ -251,11 +253,7 @@ def finalizar_locacao(db: Session, locacao_id: int):
     if locacao.status != StatusLocacao.ATIVA:
         raise ValueError("Apenas locações ativas podem ser finalizadas")
     
-    # Devolver equipamentos ao estoque
-    for item in locacao.itens:
-        equipamento = get_equipamento(db, item.equipamento_id)
-        if equipamento:
-            equipamento.estoque_alugado -= item.quantidade
+    # Estoque deve ser ajustado no ato do recebimento (devolução parcial ou total)
     
     locacao.status = StatusLocacao.FINALIZADA
     locacao.data_devolucao = datetime.now()
@@ -272,15 +270,37 @@ def cancelar_locacao(db: Session, locacao_id: int):
     if locacao.status != StatusLocacao.ATIVA:
         raise ValueError("Apenas locações ativas podem ser canceladas")
     
-    # Devolver equipamentos ao estoque
-    for item in locacao.itens:
-        equipamento = get_equipamento(db, item.equipamento_id)
-        if equipamento:
-            equipamento.estoque_alugado -= item.quantidade
+    # Estoque deve ser ajustado separadamente caso haja devolução
     
     locacao.status = StatusLocacao.CANCELADA
     
     db.commit()
+    return locacao
+
+def receber_locacao_parcial(db: Session, locacao_id: int, itens: list[Dict[str, int]]):
+    locacao = get_locacao(db, locacao_id=locacao_id)
+    if not locacao:
+        raise ValueError("Locação não encontrada")
+
+    # Mapear itens por equipamento_id para acesso rápido
+    equipamento_id_to_qtd = {i["equipamento_id"]: i["quantidade"] for i in itens}
+
+    for item in locacao.itens:
+        if item.equipamento_id in equipamento_id_to_qtd:
+            qtd_dev = equipamento_id_to_qtd[item.equipamento_id]
+            if qtd_dev <= 0:
+                continue
+            pendente = max(0, item.quantidade - (item.quantidade_devolvida or 0))
+            devolver = min(qtd_dev, pendente)
+            if devolver <= 0:
+                continue
+            equipamento = get_equipamento(db, item.equipamento_id)
+            if equipamento:
+                equipamento.estoque_alugado = max(0, equipamento.estoque_alugado - devolver)
+            item.quantidade_devolvida = (item.quantidade_devolvida or 0) + devolver
+
+    db.commit()
+    db.refresh(locacao)
     return locacao
 
 # Utility functions

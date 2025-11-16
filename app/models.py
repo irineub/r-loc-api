@@ -124,6 +124,7 @@ class ItemLocacao(Base):
     locacao_id = Column(Integer, ForeignKey("locacoes.id"), nullable=False)
     equipamento_id = Column(Integer, ForeignKey("equipamentos.id"), nullable=False)
     quantidade = Column(Integer, nullable=False)
+    quantidade_devolvida = Column(Integer, nullable=False, default=0)
     preco_unitario = Column(Float, nullable=False)
     dias = Column(Integer, nullable=False)
     subtotal = Column(Float, nullable=False)

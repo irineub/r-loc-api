@@ -4,6 +4,14 @@ from typing import List, Optional
 from app.database import get_db
 from app import crud, schemas
 from app.models import StatusLocacao
+from pydantic import BaseModel
+
+class RecebimentoItem(BaseModel):
+    equipamento_id: int
+    quantidade: int
+
+class RecebimentoParcial(BaseModel):
+    itens: List[RecebimentoItem]
 
 router = APIRouter()
 
@@ -68,7 +76,20 @@ def read_locacoes_atrasadas(db: Session = Depends(get_db)):
 @router.post("/from-orcamento/{orcamento_id}", response_model=schemas.LocacaoResponse)
 def create_locacao_from_orcamento(orcamento_id: int, db: Session = Depends(get_db)):
     """Create a locacao from an approved orcamento"""
-    db_locacao = crud.create_locacao_from_orcamento(db, orcamento_id=orcamento_id)
-    if db_locacao is None:
-        raise HTTPException(status_code=404, detail="Orçamento não encontrado ou não aprovado")
-    return {"locacao": db_locacao, "message": "Locação criada a partir do orçamento aprovado"} 
+    try:
+        db_locacao = crud.create_locacao_from_orcamento(db, orcamento_id=orcamento_id)
+        if db_locacao is None:
+            raise HTTPException(status_code=404, detail="Orçamento não encontrado ou não aprovado")
+        return {"locacao": db_locacao, "message": "Locação criada a partir do orçamento aprovado"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{locacao_id}/receber", response_model=schemas.Locacao)
+def receber_parcial(locacao_id: int, payload: RecebimentoParcial, db: Session = Depends(get_db)):
+    try:
+        locacao = crud.receber_locacao_parcial(db, locacao_id=locacao_id, itens=[i.model_dump() for i in payload.itens])
+        if locacao is None:
+            raise HTTPException(status_code=404, detail="Locação não encontrada")
+        return locacao
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
