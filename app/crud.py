@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -166,13 +166,21 @@ def rejeitar_orcamento(db: Session, orcamento_id: int):
 
 # Locacao CRUD
 def get_locacao(db: Session, locacao_id: int):
-    return db.query(models.Locacao).filter(models.Locacao.id == locacao_id).first()
+    return db.query(models.Locacao).options(
+        joinedload(models.Locacao.cliente),
+        joinedload(models.Locacao.orcamento),
+        joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
+    ).filter(models.Locacao.id == locacao_id).first()
 
 def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[StatusLocacao] = None):
     query = db.query(models.Locacao)
     if status:
         query = query.filter(models.Locacao.status == status)
-    return query.offset(skip).limit(limit).all()
+    return query.options(
+        joinedload(models.Locacao.cliente),
+        joinedload(models.Locacao.orcamento),
+        joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
+    ).offset(skip).limit(limit).all()
 
 def create_locacao_from_orcamento(db: Session, orcamento_id: int):
     # Buscar o orçamento
