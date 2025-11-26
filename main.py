@@ -10,7 +10,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="R-Loc API",
     description="Sistema de Locação de Equipamentos de Construção",
-    version="1.0.0"
+    version="1.0.0",
+    openapi_version="3.1.0"
 )
 
 # Configure CORS
