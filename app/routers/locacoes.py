@@ -18,7 +18,10 @@ router = APIRouter()
 @router.post("/", response_model=schemas.Locacao)
 def create_locacao(locacao: schemas.LocacaoCreate, db: Session = Depends(get_db)):
     """Create a new locacao"""
-    return crud.create_locacao_from_orcamento(db=db, orcamento_id=locacao.orcamento_id)
+    try:
+        return crud.create_locacao_from_orcamento(db=db, orcamento_id=locacao.orcamento_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[schemas.Locacao])
 def read_locacoes(
@@ -50,18 +53,24 @@ def update_locacao(locacao_id: int, locacao: schemas.LocacaoUpdate, db: Session 
 @router.post("/{locacao_id}/finalizar", response_model=schemas.LocacaoResponse)
 def finalizar_locacao(locacao_id: int, db: Session = Depends(get_db)):
     """Finalize a locacao"""
-    db_locacao = crud.finalizar_locacao(db, locacao_id=locacao_id)
-    if db_locacao is None:
-        raise HTTPException(status_code=404, detail="Locação não encontrada")
-    return {"locacao": db_locacao, "message": "Locação finalizada com sucesso"}
+    try:
+        db_locacao = crud.finalizar_locacao(db, locacao_id=locacao_id)
+        if db_locacao is None:
+            raise HTTPException(status_code=404, detail="Locação não encontrada")
+        return {"locacao": db_locacao, "message": "Locação finalizada com sucesso"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{locacao_id}/cancelar", response_model=schemas.LocacaoResponse)
 def cancelar_locacao(locacao_id: int, db: Session = Depends(get_db)):
     """Cancel a locacao"""
-    db_locacao = crud.cancelar_locacao(db, locacao_id=locacao_id)
-    if db_locacao is None:
-        raise HTTPException(status_code=404, detail="Locação não encontrada")
-    return {"locacao": db_locacao, "message": "Locação cancelada"}
+    try:
+        db_locacao = crud.cancelar_locacao(db, locacao_id=locacao_id)
+        if db_locacao is None:
+            raise HTTPException(status_code=404, detail="Locação não encontrada")
+        return {"locacao": db_locacao, "message": "Locação cancelada"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/ativas/", response_model=List[schemas.Locacao])
 def read_locacoes_ativas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
