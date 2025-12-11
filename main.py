@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app.models import Base
-from app.routers import clientes, equipamentos, orcamentos, locacoes
+from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionarios, logs
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -28,6 +28,8 @@ app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
 app.include_router(equipamentos.router, prefix="/equipamentos", tags=["Equipamentos"])
 app.include_router(orcamentos.router, prefix="/orcamentos", tags=["Orçamentos"])
 app.include_router(locacoes.router, prefix="/locacoes", tags=["Locações"])
+app.include_router(funcionarios.router, prefix="/funcionarios", tags=["Funcionários"])
+app.include_router(logs.router, prefix="/logs", tags=["Logs"])
 
 @app.get("/")
 async def root():

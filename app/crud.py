@@ -328,4 +328,92 @@ def get_locacoes_atrasadas(db: Session):
             models.Locacao.status == StatusLocacao.ATIVA,
             models.Locacao.data_fim < hoje
         )
-    ).all() 
+    ).all()
+
+# Funcionario CRUD
+def get_funcionario(db: Session, funcionario_id: int):
+    return db.query(models.Funcionario).filter(models.Funcionario.id == funcionario_id).first()
+
+def get_funcionario_by_username(db: Session, username: str):
+    return db.query(models.Funcionario).filter(models.Funcionario.username == username).first()
+
+def get_funcionarios(db: Session, skip: int = 0, limit: int = 100, ativo: Optional[bool] = None):
+    query = db.query(models.Funcionario)
+    if ativo is not None:
+        query = query.filter(models.Funcionario.ativo == ativo)
+    return query.offset(skip).limit(limit).all()
+
+def create_funcionario(db: Session, funcionario: schemas.FuncionarioCreate):
+    # Verificar se username já existe
+    existing = get_funcionario_by_username(db, funcionario.username)
+    if existing:
+        raise ValueError("Username já existe")
+    
+    senha_hash = models.Funcionario.hash_senha(funcionario.senha)
+    db_funcionario = models.Funcionario(
+        username=funcionario.username,
+        senha_hash=senha_hash,
+        nome=funcionario.nome,
+        ativo=funcionario.ativo
+    )
+    db.add(db_funcionario)
+    db.commit()
+    db.refresh(db_funcionario)
+    return db_funcionario
+
+def update_funcionario(db: Session, funcionario_id: int, funcionario: schemas.FuncionarioUpdate):
+    db_funcionario = get_funcionario(db, funcionario_id)
+    if db_funcionario:
+        update_data = funcionario.dict(exclude_unset=True)
+        if 'senha' in update_data:
+            update_data['senha_hash'] = models.Funcionario.hash_senha(update_data.pop('senha'))
+        for field, value in update_data.items():
+            setattr(db_funcionario, field, value)
+        db.commit()
+        db.refresh(db_funcionario)
+    return db_funcionario
+
+def delete_funcionario(db: Session, funcionario_id: int):
+    db_funcionario = get_funcionario(db, funcionario_id)
+    if db_funcionario:
+        db.delete(db_funcionario)
+        db.commit()
+    return db_funcionario
+
+def autenticar_funcionario(db: Session, username: str, senha: str):
+    """Autentica um funcionário e retorna o funcionário se válido"""
+    funcionario = get_funcionario_by_username(db, username)
+    if not funcionario:
+        return None
+    if not funcionario.ativo:
+        return None
+    if funcionario.verificar_senha(senha):
+        return funcionario
+    return None
+
+# LogAuditoria CRUD
+def create_log(db: Session, funcionario_id: Optional[int], funcionario_username: Optional[str], 
+               acao: str, entidade: str, entidade_id: Optional[int] = None, detalhes: Optional[str] = None):
+    """Cria um log de auditoria"""
+    log = models.LogAuditoria(
+        funcionario_id=funcionario_id,
+        funcionario_username=funcionario_username,
+        acao=acao,
+        entidade=entidade,
+        entidade_id=entidade_id,
+        detalhes=detalhes
+    )
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+    return log
+
+def get_logs(db: Session, skip: int = 0, limit: int = 100, 
+             funcionario_id: Optional[int] = None, entidade: Optional[str] = None):
+    """Busca logs de auditoria com filtros opcionais"""
+    query = db.query(models.LogAuditoria)
+    if funcionario_id:
+        query = query.filter(models.LogAuditoria.funcionario_id == funcionario_id)
+    if entidade:
+        query = query.filter(models.LogAuditoria.entidade == entidade)
+    return query.order_by(models.LogAuditoria.data_hora.desc()).offset(skip).limit(limit).all() 

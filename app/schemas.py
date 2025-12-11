@@ -170,4 +170,48 @@ class OrcamentoResponse(BaseModel):
 
 class LocacaoResponse(BaseModel):
     locacao: Locacao
-    message: str 
+    message: str
+
+# Funcionario Schemas
+class FuncionarioBase(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    nome: str = Field(..., min_length=1, max_length=200)
+    ativo: bool = True
+
+class FuncionarioCreate(FuncionarioBase):
+    senha: str = Field(..., min_length=4)
+
+class FuncionarioUpdate(BaseModel):
+    nome: Optional[str] = Field(None, min_length=1, max_length=200)
+    senha: Optional[str] = Field(None, min_length=4)
+    ativo: Optional[bool] = None
+
+class FuncionarioLogin(BaseModel):
+    username: str
+    senha: str
+
+class Funcionario(FuncionarioBase):
+    id: int
+    data_cadastro: datetime
+
+    class Config:
+        from_attributes = True
+
+# LogAuditoria Schemas
+class LogAuditoriaBase(BaseModel):
+    funcionario_username: Optional[str] = None
+    acao: str
+    entidade: str
+    entidade_id: Optional[int] = None
+    detalhes: Optional[str] = None
+
+class LogAuditoriaCreate(LogAuditoriaBase):
+    funcionario_id: Optional[int] = None
+
+class LogAuditoria(LogAuditoriaBase):
+    id: int
+    funcionario_id: Optional[int] = None
+    data_hora: datetime
+
+    class Config:
+        from_attributes = True 

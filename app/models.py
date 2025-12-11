@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text, Enum, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
 import enum
+import hashlib
 
 class TipoPessoa(str, enum.Enum):
     FISICA = "fisica"
@@ -131,4 +132,42 @@ class ItemLocacao(Base):
 
     # Relationships
     locacao = relationship("Locacao", back_populates="itens")
-    equipamento = relationship("Equipamento") 
+    equipamento = relationship("Equipamento")
+
+class Funcionario(Base):
+    __tablename__ = "funcionarios"
+
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    senha_hash = Column(String(255), nullable=False)
+    nome = Column(String(200), nullable=False)
+    ativo = Column(Boolean, default=True, nullable=False)
+    data_cadastro = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    logs = relationship("LogAuditoria", back_populates="funcionario")
+
+    def verificar_senha(self, senha: str) -> bool:
+        """Verifica se a senha fornecida corresponde ao hash armazenado"""
+        senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+        return senha_hash == self.senha_hash
+
+    @staticmethod
+    def hash_senha(senha: str) -> str:
+        """Gera o hash da senha"""
+        return hashlib.sha256(senha.encode()).hexdigest()
+
+class LogAuditoria(Base):
+    __tablename__ = "logs_auditoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=True)
+    funcionario_username = Column(String(50), nullable=True)  # Para manter histórico mesmo se funcionário for deletado
+    acao = Column(String(100), nullable=False)  # Ex: "criar_orcamento", "atualizar_cliente", etc
+    entidade = Column(String(50), nullable=False)  # Ex: "orcamento", "cliente", "equipamento", etc
+    entidade_id = Column(Integer, nullable=True)  # ID da entidade afetada
+    detalhes = Column(Text)  # Detalhes adicionais da ação
+    data_hora = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    funcionario = relationship("Funcionario", back_populates="logs") 
