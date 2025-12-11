@@ -1,14 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app import crud, schemas
+from app.auth import require_master
 
 router = APIRouter()
 
 @router.post("/", response_model=schemas.Funcionario)
-def create_funcionario(funcionario: schemas.FuncionarioCreate, db: Session = Depends(get_db)):
-    """Create a new funcionario"""
+def create_funcionario(
+    funcionario: schemas.FuncionarioCreate, 
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master)
+):
+    """Create a new funcionario - Apenas usuários master"""
     try:
         return crud.create_funcionario(db=db, funcionario=funcionario)
     except ValueError as e:
@@ -19,31 +24,45 @@ def read_funcionarios(
     skip: int = 0, 
     limit: int = 100,
     ativo: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master)
 ):
-    """Get all funcionarios"""
+    """Get all funcionarios - Apenas usuários master"""
     funcionarios = crud.get_funcionarios(db, skip=skip, limit=limit, ativo=ativo)
     return funcionarios
 
 @router.get("/{funcionario_id}", response_model=schemas.Funcionario)
-def read_funcionario(funcionario_id: int, db: Session = Depends(get_db)):
-    """Get a specific funcionario by ID"""
+def read_funcionario(
+    funcionario_id: int, 
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master)
+):
+    """Get a specific funcionario by ID - Apenas usuários master"""
     db_funcionario = crud.get_funcionario(db, funcionario_id=funcionario_id)
     if db_funcionario is None:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
     return db_funcionario
 
 @router.put("/{funcionario_id}", response_model=schemas.Funcionario)
-def update_funcionario(funcionario_id: int, funcionario: schemas.FuncionarioUpdate, db: Session = Depends(get_db)):
-    """Update a funcionario"""
+def update_funcionario(
+    funcionario_id: int, 
+    funcionario: schemas.FuncionarioUpdate, 
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master)
+):
+    """Update a funcionario - Apenas usuários master"""
     db_funcionario = crud.update_funcionario(db, funcionario_id=funcionario_id, funcionario=funcionario)
     if db_funcionario is None:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
     return db_funcionario
 
 @router.delete("/{funcionario_id}")
-def delete_funcionario(funcionario_id: int, db: Session = Depends(get_db)):
-    """Delete a funcionario"""
+def delete_funcionario(
+    funcionario_id: int, 
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master)
+):
+    """Delete a funcionario - Apenas usuários master"""
     db_funcionario = crud.delete_funcionario(db, funcionario_id=funcionario_id)
     if db_funcionario is None:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
