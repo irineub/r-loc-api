@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 import json
 
-# URL da API de staging
+# URL da API (alterar para staging quando necessário)
 API_URL = "https://srv938431.hstgr.cloud/api"
 
 # Dados realistas para geração
@@ -95,10 +95,10 @@ def criar_equipamento(dados: Dict) -> Dict:
     return {
         "descricao": dados["descricao"],
         "unidade": dados["unidade"],
-        "preco_diaria": preco_base,
-        "preco_semanal": preco_base * 7 * 0.9,  # 10% de desconto para semanal
-        "preco_quinzenal": preco_base * 15 * 0.85,  # 15% de desconto para quinzenal
-        "preco_mensal": preco_base * 30 * 0.8,  # 20% de desconto para mensal
+        "preco_diaria": round(preco_base, 2),
+        "preco_semanal": round(preco_base * 7 * 0.9, 2),  # 10% de desconto para semanal
+        "preco_quinzenal": round(preco_base * 15 * 0.85, 2),  # 15% de desconto para quinzenal
+        "preco_mensal": round(preco_base * 30 * 0.8, 2),  # 20% de desconto para mensal
         "estoque": dados["estoque"],
         "estoque_alugado": random.randint(0, dados["estoque"] // 3),
     }
@@ -235,9 +235,10 @@ def popular_dados():
     print("🔧 Criando equipamentos...")
     for equip_data in EQUIPAMENTOS:
         try:
+            equip_payload = criar_equipamento(equip_data)
             response = requests.post(
                 f"{API_URL}/equipamentos/",
-                json=criar_equipamento(equip_data),
+                json=equip_payload,
                 timeout=10
             )
             if response.status_code in [200, 201]:
@@ -245,7 +246,12 @@ def popular_dados():
                 equipamentos_criados.append(equip)
                 print(f"  ✅ {equip['descricao']} - Diária: R$ {equip.get('preco_diaria', 0):.2f}")
             else:
-                print(f"  ❌ Erro ao criar {equip_data['descricao']}: {response.status_code}")
+                error_detail = ""
+                try:
+                    error_detail = response.json().get('detail', '')
+                except:
+                    error_detail = response.text[:100]
+                print(f"  ❌ Erro ao criar {equip_data['descricao']}: {response.status_code} - {error_detail}")
         except Exception as e:
             print(f"  ❌ Erro ao criar {equip_data['descricao']}: {e}")
     
