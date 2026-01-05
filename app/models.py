@@ -11,6 +11,8 @@ class TipoPessoa(str, enum.Enum):
 
 class TipoCobranca(str, enum.Enum):
     DIARIA = "diaria"
+    SEMANAL = "semanal"
+    QUINZENAL = "quinzenal"
     MENSAL = "mensal"
 
 class StatusOrcamento(str, enum.Enum):
@@ -53,7 +55,10 @@ class Equipamento(Base):
     id = Column(Integer, primary_key=True, index=True)
     descricao = Column(String, nullable=False)
     unidade = Column(String, nullable=False)
-    preco_unitario = Column(Float, nullable=False)
+    preco_diaria = Column(Float, nullable=False)
+    preco_semanal = Column(Float, nullable=False)
+    preco_quinzenal = Column(Float, nullable=False)
+    preco_mensal = Column(Float, nullable=False)
     estoque = Column(Integer, default=1, nullable=False)  # Quantidade disponível em estoque
     estoque_alugado = Column(Integer, default=0, nullable=False)  # Quantidade atualmente alugada
 
@@ -92,7 +97,7 @@ class ItemOrcamento(Base):
     quantidade = Column(Integer, nullable=False)
     preco_unitario = Column(Float, nullable=False)
     dias = Column(Integer, nullable=False)
-    tipo_cobranca = Column(Enum('diaria', 'mensal', name='tipo_cobranca_item'), nullable=False, default='diaria')
+    tipo_cobranca = Column(Enum('diaria', 'semanal', 'quinzenal', 'mensal', name='tipo_cobranca_item'), nullable=False, default='diaria')
     subtotal = Column(Float, nullable=False)
 
     # Relationships

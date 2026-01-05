@@ -36,7 +36,10 @@ class Cliente(ClienteBase):
 class EquipamentoBase(BaseModel):
     descricao: str
     unidade: str
-    preco_unitario: float
+    preco_diaria: float = Field(..., gt=0)
+    preco_semanal: float = Field(..., gt=0)
+    preco_quinzenal: float = Field(..., gt=0)
+    preco_mensal: float = Field(..., gt=0)
     estoque: int = 1
     estoque_alugado: int = 0
 
@@ -46,7 +49,10 @@ class EquipamentoCreate(EquipamentoBase):
 class EquipamentoUpdate(BaseModel):
     descricao: Optional[str] = None
     unidade: Optional[str] = None
-    preco_unitario: Optional[float] = None
+    preco_diaria: Optional[float] = Field(None, gt=0)
+    preco_semanal: Optional[float] = Field(None, gt=0)
+    preco_quinzenal: Optional[float] = Field(None, gt=0)
+    preco_mensal: Optional[float] = Field(None, gt=0)
     estoque: Optional[int] = None
 
 class Equipamento(EquipamentoBase):

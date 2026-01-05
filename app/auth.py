@@ -24,3 +24,4 @@ def require_master(x_funcionario_username: Optional[str] = Header(None)):
         )
     return username
 
+

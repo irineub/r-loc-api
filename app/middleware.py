@@ -5,3 +5,4 @@ async def get_funcionario_username(request: Request, x_funcionario_username: Opt
     """Extrai o username do funcionário do header da requisição"""
     return x_funcionario_username
 
+

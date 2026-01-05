@@ -90,11 +90,15 @@ def criar_cliente_pj(dados: Dict) -> Dict:
     }
 
 def criar_equipamento(dados: Dict) -> Dict:
-    """Cria um equipamento"""
+    """Cria um equipamento com preços por tipo de cobrança"""
+    preco_base = dados["preco"]
     return {
         "descricao": dados["descricao"],
         "unidade": dados["unidade"],
-        "preco_unitario": dados["preco"],
+        "preco_diaria": preco_base,
+        "preco_semanal": preco_base * 7 * 0.9,  # 10% de desconto para semanal
+        "preco_quinzenal": preco_base * 15 * 0.85,  # 15% de desconto para quinzenal
+        "preco_mensal": preco_base * 30 * 0.8,  # 20% de desconto para mensal
         "estoque": dados["estoque"],
         "estoque_alugado": random.randint(0, dados["estoque"] // 3),
     }
@@ -131,7 +135,7 @@ def criar_orcamento(cliente_id: int, equipamentos_ids: List[int], funcionario_us
             "quantidade": quantidade,
             "preco_unitario": preco,
             "dias": dias,
-            "tipo_cobranca": random.choice(["diaria", "mensal"]),
+            "tipo_cobranca": random.choice(["diaria", "semanal", "quinzenal", "mensal"]),
             "subtotal": subtotal,
         })
     
@@ -239,7 +243,7 @@ def popular_dados():
             if response.status_code in [200, 201]:
                 equip = response.json()
                 equipamentos_criados.append(equip)
-                print(f"  ✅ {equip['descricao']} - R$ {equip['preco_unitario']:.2f}")
+                print(f"  ✅ {equip['descricao']} - Diária: R$ {equip.get('preco_diaria', 0):.2f}")
             else:
                 print(f"  ❌ Erro ao criar {equip_data['descricao']}: {response.status_code}")
         except Exception as e:
@@ -355,4 +359,5 @@ def popular_dados():
 
 if __name__ == "__main__":
     popular_dados()
+
 
