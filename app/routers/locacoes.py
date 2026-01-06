@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Body
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
@@ -12,6 +12,9 @@ class RecebimentoItem(BaseModel):
 
 class RecebimentoParcial(BaseModel):
     itens: List[RecebimentoItem]
+
+class LocacaoFromOrcamentoRequest(BaseModel):
+    endereco_entrega: Optional[str] = None
 
 router = APIRouter()
 
@@ -134,13 +137,15 @@ def read_locacoes_atrasadas(db: Session = Depends(get_db)):
 
 @router.post("/from-orcamento/{orcamento_id}", response_model=schemas.LocacaoResponse)
 def create_locacao_from_orcamento(
-    orcamento_id: int, 
+    orcamento_id: int,
+    request: Optional[LocacaoFromOrcamentoRequest] = None,
     db: Session = Depends(get_db),
     x_funcionario_username: Optional[str] = Header(None)
 ):
     """Create a locacao from an approved orcamento"""
     try:
-        db_locacao = crud.create_locacao_from_orcamento(db, orcamento_id=orcamento_id)
+        endereco_entrega = request.endereco_entrega if request else None
+        db_locacao = crud.create_locacao_from_orcamento(db, orcamento_id=orcamento_id, endereco_entrega=endereco_entrega)
         if db_locacao is None:
             raise HTTPException(status_code=404, detail="Orçamento não encontrado ou não aprovado")
         

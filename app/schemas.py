@@ -148,6 +148,7 @@ class LocacaoBase(BaseModel):
     data_fim: datetime
     total_final: float = Field(..., gt=0)
     observacoes: Optional[str] = None
+    endereco_entrega: Optional[str] = None
 
 class LocacaoCreate(LocacaoBase):
     itens: List[ItemLocacaoCreate]
@@ -156,11 +157,13 @@ class LocacaoUpdate(BaseModel):
     status: Optional[StatusLocacao] = None
     data_devolucao: Optional[datetime] = None
     observacoes: Optional[str] = None
+    endereco_entrega: Optional[str] = None
 
 class Locacao(LocacaoBase):
     id: int
     status: StatusLocacao
     data_devolucao: Optional[datetime] = None
+    endereco_entrega: Optional[str] = None
     data_criacao: datetime
     orcamento: Orcamento
     cliente: Cliente

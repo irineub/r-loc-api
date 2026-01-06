@@ -116,6 +116,7 @@ class Locacao(Base):
     total_final = Column(Float, nullable=False)
     observacoes = Column(Text)
     data_devolucao = Column(DateTime)
+    endereco_entrega = Column(Text)  # Endereço de entrega dos equipamentos
     data_criacao = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

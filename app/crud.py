@@ -182,7 +182,7 @@ def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[
         joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
     ).offset(skip).limit(limit).all()
 
-def create_locacao_from_orcamento(db: Session, orcamento_id: int):
+def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entrega: Optional[str] = None):
     # Buscar o orçamento
     orcamento = db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
     if not orcamento:
@@ -203,7 +203,8 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int):
         "data_inicio": orcamento.data_inicio,
         "data_fim": orcamento.data_fim,
         "total_final": orcamento.total_final,
-        "status": "ativa"
+        "status": "ativa",
+        "endereco_entrega": endereco_entrega
     }
     
     db_locacao = models.Locacao(**locacao_data)
