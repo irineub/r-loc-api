@@ -22,6 +22,8 @@ def create_equipamento(equipamento: schemas.EquipamentoCreate, db: Session = Dep
     return crud.create_equipamento(db=db, equipamento=equipamento)
 
 @router.put("/{equipamento_id}", response_model=schemas.Equipamento)
+@router.patch("/{equipamento_id}", response_model=schemas.Equipamento)
+@router.post("/{equipamento_id}/update", response_model=schemas.Equipamento)
 def update_equipamento(equipamento_id: int, equipamento: schemas.EquipamentoUpdate, db: Session = Depends(get_db)):
     try:
         db_equipamento = crud.update_equipamento(db, equipamento_id=equipamento_id, equipamento=equipamento)

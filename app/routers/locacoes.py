@@ -46,6 +46,8 @@ def read_locacao(locacao_id: int, db: Session = Depends(get_db)):
     return db_locacao
 
 @router.put("/{locacao_id}", response_model=schemas.Locacao)
+@router.patch("/{locacao_id}", response_model=schemas.Locacao)
+@router.post("/{locacao_id}/update", response_model=schemas.Locacao)
 def update_locacao(locacao_id: int, locacao: schemas.LocacaoUpdate, db: Session = Depends(get_db)):
     """Update a locacao"""
     db_locacao = crud.update_locacao(db, locacao_id=locacao_id, locacao=locacao)

@@ -44,6 +44,8 @@ def read_funcionario(
     return db_funcionario
 
 @router.put("/{funcionario_id}", response_model=schemas.Funcionario)
+@router.patch("/{funcionario_id}", response_model=schemas.Funcionario)
+@router.post("/{funcionario_id}/update", response_model=schemas.Funcionario)
 def update_funcionario(
     funcionario_id: int, 
     funcionario: schemas.FuncionarioUpdate, 

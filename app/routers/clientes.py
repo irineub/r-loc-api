@@ -26,6 +26,8 @@ def read_cliente(cliente_id: int, db: Session = Depends(get_db)):
     return db_cliente
 
 @router.put("/{cliente_id}", response_model=schemas.Cliente)
+@router.patch("/{cliente_id}", response_model=schemas.Cliente)
+@router.post("/{cliente_id}/update", response_model=schemas.Cliente)
 def update_cliente(cliente_id: int, cliente: schemas.ClienteUpdate, db: Session = Depends(get_db)):
     """Update a cliente"""
     db_cliente = crud.update_cliente(db, cliente_id=cliente_id, cliente=cliente)
