@@ -9,8 +9,8 @@ from typing import List, Dict
 import json
 
 # URL da API (alterar para staging quando necessário)
-API_URL = "http://localhost:8000"
-# API_URL = "https://srv938431.hstgr.cloud/api"
+# API_URL = "http://localhost:8000"
+API_URL = "https://srv938431.hstgr.cloud/api"
 # Dados realistas para geração
 CLIENTES_PF = [
     {"nome": "João Silva", "cpf": "123.456.789-00", "rg": "12.345.678-9", "email": "joao.silva@email.com", "telefone": "(92) 98765-4321"},

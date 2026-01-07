@@ -58,6 +58,7 @@ def read_orcamento(orcamento_id: int, db: Session = Depends(get_db)):
     return db_orcamento
 
 @router.put("/{orcamento_id}", response_model=schemas.Orcamento)
+@router.patch("/{orcamento_id}", response_model=schemas.Orcamento)
 def update_orcamento(orcamento_id: int, orcamento: schemas.OrcamentoUpdate, db: Session = Depends(get_db)):
     """Update an orcamento"""
     db_orcamento = crud.update_orcamento(db, orcamento_id=orcamento_id, orcamento=orcamento)
