@@ -9,29 +9,40 @@ from typing import List, Dict
 import json
 
 # URL da API (alterar para staging quando necessário)
-API_URL = "localhost:8000/api"
-
+API_URL = "http://localhost:8000"
+# API_URL = "https://srv938431.hstgr.cloud/api"
 # Dados realistas para geração
 CLIENTES_PF = [
-    {"nome": "João Silva", "cpf": "123.456.789-00", "rg": "12.345.678-9", "email": "joao.silva@email.com", "telefone": "(11) 98765-4321"},
-    {"nome": "Maria Santos", "cpf": "234.567.890-11", "rg": "23.456.789-0", "email": "maria.santos@email.com", "telefone": "(11) 97654-3210"},
-    {"nome": "Pedro Oliveira", "cpf": "345.678.901-22", "rg": "34.567.890-1", "email": "pedro.oliveira@email.com", "telefone": "(11) 96543-2109"},
-    {"nome": "Ana Costa", "cpf": "456.789.012-33", "rg": "45.678.901-2", "email": "ana.costa@email.com", "telefone": "(11) 95432-1098"},
-    {"nome": "Carlos Ferreira", "cpf": "567.890.123-44", "rg": "56.789.012-3", "email": "carlos.ferreira@email.com", "telefone": "(11) 94321-0987"},
-    {"nome": "Juliana Alves", "cpf": "678.901.234-55", "rg": "67.890.123-4", "email": "juliana.alves@email.com", "telefone": "(11) 93210-9876"},
-    {"nome": "Roberto Lima", "cpf": "789.012.345-66", "rg": "78.901.234-5", "email": "roberto.lima@email.com", "telefone": "(11) 92109-8765"},
-    {"nome": "Fernanda Rocha", "cpf": "890.123.456-77", "rg": "89.012.345-6", "email": "fernanda.rocha@email.com", "telefone": "(11) 91098-7654"},
+    {"nome": "João Silva", "cpf": "123.456.789-00", "rg": "12.345.678-9", "email": "joao.silva@email.com", "telefone": "(92) 98765-4321"},
+    {"nome": "Maria Santos", "cpf": "234.567.890-11", "rg": "23.456.789-0", "email": "maria.santos@email.com", "telefone": "(92) 97654-3210"},
+    {"nome": "Pedro Oliveira", "cpf": "345.678.901-22", "rg": "34.567.890-1", "email": "pedro.oliveira@email.com", "telefone": "(92) 96543-2109"},
+    {"nome": "Ana Costa", "cpf": "456.789.012-33", "rg": "45.678.901-2", "email": "ana.costa@email.com", "telefone": "(92) 95432-1098"},
+    {"nome": "Carlos Ferreira", "cpf": "567.890.123-44", "rg": "56.789.012-3", "email": "carlos.ferreira@email.com", "telefone": "(92) 94321-0987"},
+    {"nome": "Juliana Alves", "cpf": "678.901.234-55", "rg": "67.890.123-4", "email": "juliana.alves@email.com", "telefone": "(92) 93210-9876"},
+    {"nome": "Roberto Lima", "cpf": "789.012.345-66", "rg": "78.901.234-5", "email": "roberto.lima@email.com", "telefone": "(92) 92109-8765"},
+    {"nome": "Fernanda Rocha", "cpf": "890.123.456-77", "rg": "89.012.345-6", "email": "fernanda.rocha@email.com", "telefone": "(92) 91098-7654"},
+    {"nome": "Rafael Souza", "cpf": "901.234.567-88", "rg": "90.123.456-7", "email": "rafael.souza@email.com", "telefone": "(92) 99988-7766"},
+    {"nome": "Patricia Lima", "cpf": "012.345.678-99", "rg": "01.234.567-8", "email": "patricia.lima@email.com", "telefone": "(92) 98877-6655"},
+    {"nome": "Bruno Martins", "cpf": "111.222.333-44", "rg": "11.222.333-4", "email": "bruno.martins@email.com", "telefone": "(92) 97766-5544"},
+    {"nome": "Camila Rodrigues", "cpf": "222.333.444-55", "rg": "22.333.444-5", "email": "camila.rodrigues@email.com", "telefone": "(92) 96655-4433"},
+    {"nome": "Thiago Almeida", "cpf": "333.444.555-66", "rg": "33.444.555-6", "email": "thiago.almeida@email.com", "telefone": "(92) 95544-3322"},
+    {"nome": "Larissa Barbosa", "cpf": "444.555.666-77", "rg": "44.555.666-7", "email": "larissa.barbosa@email.com", "telefone": "(92) 94433-2211"},
+    {"nome": "André Pereira", "cpf": "555.666.777-88", "rg": "55.666.777-8", "email": "andre.pereira@email.com", "telefone": "(92) 93322-1100"},
 ]
 
 CLIENTES_PJ = [
-    {"nome": "Construtora ABC Ltda", "cnpj": "12.345.678/0001-90", "ie": "123.456.789.012", "email": "contato@abc.com.br", "telefone": "(11) 3456-7890"},
-    {"nome": "Engenharia XYZ S.A.", "cnpj": "23.456.789/0001-01", "ie": "234.567.890.123", "email": "contato@xyz.com.br", "telefone": "(11) 3456-7891"},
-    {"nome": "Construções Modernas EIRELI", "cnpj": "34.567.890/0001-12", "ie": "345.678.901.234", "email": "contato@modernas.com.br", "telefone": "(11) 3456-7892"},
-    {"nome": "Obras e Construções Silva", "cnpj": "45.678.901/0001-23", "ie": "456.789.012.345", "email": "contato@obras.com.br", "telefone": "(11) 3456-7893"},
-    {"nome": "Construtora Horizonte", "cnpj": "56.789.012/0001-34", "ie": "567.890.123.456", "email": "contato@horizonte.com.br", "telefone": "(11) 3456-7894"},
-    {"nome": "Infraestrutura Brasil", "cnpj": "67.890.123/0001-45", "ie": "678.901.234.567", "email": "contato@infra.com.br", "telefone": "(11) 3456-7895"},
-    {"nome": "Construções Rápidas", "cnpj": "78.901.234/0001-56", "ie": "789.012.345.678", "email": "contato@rapidas.com.br", "telefone": "(11) 3456-7896"},
-    {"nome": "Engenharia e Projetos", "cnpj": "89.012.345/0001-67", "ie": "890.123.456.789", "email": "contato@engenharia.com.br", "telefone": "(11) 3456-7897"},
+    {"nome": "Construtora ABC Ltda", "cnpj": "12.345.678/0001-90", "ie": "123.456.789.012", "email": "contato@abc.com.br", "telefone": "(92) 3456-7890"},
+    {"nome": "Engenharia XYZ S.A.", "cnpj": "23.456.789/0001-01", "ie": "234.567.890.123", "email": "contato@xyz.com.br", "telefone": "(92) 3456-7891"},
+    {"nome": "Construções Modernas EIRELI", "cnpj": "34.567.890/0001-12", "ie": "345.678.901.234", "email": "contato@modernas.com.br", "telefone": "(92) 3456-7892"},
+    {"nome": "Obras e Construções Silva", "cnpj": "45.678.901/0001-23", "ie": "456.789.012.345", "email": "contato@obras.com.br", "telefone": "(92) 3456-7893"},
+    {"nome": "Construtora Horizonte", "cnpj": "56.789.012/0001-34", "ie": "567.890.123.456", "email": "contato@horizonte.com.br", "telefone": "(92) 3456-7894"},
+    {"nome": "Infraestrutura Brasil", "cnpj": "67.890.123/0001-45", "ie": "678.901.234.567", "email": "contato@infra.com.br", "telefone": "(92) 3456-7895"},
+    {"nome": "Construções Rápidas", "cnpj": "78.901.234/0001-56", "ie": "789.012.345.678", "email": "contato@rapidas.com.br", "telefone": "(92) 3456-7896"},
+    {"nome": "Engenharia e Projetos", "cnpj": "89.012.345/0001-67", "ie": "890.123.456.789", "email": "contato@engenharia.com.br", "telefone": "(92) 3456-7897"},
+    {"nome": "Amazônia Construções", "cnpj": "90.123.456/0001-78", "ie": "901.234.567.890", "email": "contato@amazonia.com.br", "telefone": "(92) 3344-5566"},
+    {"nome": "Rio Negro Obras", "cnpj": "01.234.567/0001-89", "ie": "012.345.678.901", "email": "contato@rionegro.com.br", "telefone": "(92) 3234-5678"},
+    {"nome": "Manaus Engenharia", "cnpj": "11.111.222/0001-33", "ie": "111.222.333.444", "email": "contato@manauseng.com.br", "telefone": "(92) 3123-4567"},
+    {"nome": "Amazonas Construtora", "cnpj": "22.222.333/0001-44", "ie": "222.333.444.555", "email": "contato@amazonascon.com.br", "telefone": "(92) 3012-3456"},
 ]
 
 EQUIPAMENTOS = [
@@ -66,7 +77,19 @@ FUNCIONARIOS = [
 ]
 
 def criar_cliente_pf(dados: Dict) -> Dict:
-    """Cria um cliente pessoa física"""
+    """Cria um cliente pessoa física com endereço de Manaus"""
+    ruas_manaus = [
+        "Av. Djalma Batista", "Av. Getúlio Vargas", "Av. Constantino Nery", 
+        "Av. Torquato Tapajós", "Av. Eduardo Ribeiro", "Rua 10 de Julho",
+        "Rua São Luís", "Rua Barroso", "Rua Ramos Ferreira", "Rua Recife",
+        "Av. Tancredo Neves", "Av. Max Teixeira", "Rua José Clemente",
+        "Rua Libertador", "Rua 24 de Maio", "Av. Paraíba"
+    ]
+    bairros_manaus = [
+        "Centro", "Aleixo", "Adrianópolis", "Chapada", "Coroado",
+        "São Raimundo", "Educandos", "Tarumã", "Ponta Negra", "Japiim",
+        "Planalto", "Cidade Nova", "Alvorada", "Jorge Teixeira", "Compensa"
+    ]
     return {
         "nome_razao_social": dados["nome"],
         "tipo_pessoa": "fisica",
@@ -74,11 +97,21 @@ def criar_cliente_pf(dados: Dict) -> Dict:
         "rg": dados["rg"],
         "email": dados["email"],
         "telefone_celular": dados["telefone"],
-        "endereco": f"Rua {random.randint(1, 999)}, Bairro Centro, São Paulo - SP",
+        "endereco": f"{random.choice(ruas_manaus)}, {random.randint(100, 9999)}, {random.choice(bairros_manaus)} - Manaus/AM",
     }
 
 def criar_cliente_pj(dados: Dict) -> Dict:
-    """Cria um cliente pessoa jurídica"""
+    """Cria um cliente pessoa jurídica com endereço de Manaus"""
+    avenidas_manaus = [
+        "Av. Djalma Batista", "Av. Getúlio Vargas", "Av. Constantino Nery",
+        "Av. Torquato Tapajós", "Av. Eduardo Ribeiro", "Av. Tancredo Neves",
+        "Av. Max Teixeira", "Av. Paraíba", "Av. Umberto Calderaro",
+        "Av. Dom Pedro I", "Av. Brasil", "Av. Autaz Mirim"
+    ]
+    bairros_manaus_pj = [
+        "Centro", "Aleixo", "Adrianópolis", "Chapada", "Distrito Industrial",
+        "Ponta Negra", "Cidade Nova", "Japiim", "Alvorada", "Compensa"
+    ]
     return {
         "nome_razao_social": dados["nome"],
         "tipo_pessoa": "juridica",
@@ -86,7 +119,7 @@ def criar_cliente_pj(dados: Dict) -> Dict:
         "inscricao_estadual": dados["ie"],
         "email": dados["email"],
         "telefone_comercial": dados["telefone"],
-        "endereco": f"Av. {random.choice(['Paulista', 'Faria Lima', 'Brigadeiro', '9 de Julho'])}, {random.randint(100, 9999)}, São Paulo - SP",
+        "endereco": f"{random.choice(avenidas_manaus)}, {random.randint(100, 9999)}, {random.choice(bairros_manaus_pj)} - Manaus/AM",
     }
 
 def criar_equipamento(dados: Dict) -> Dict:
@@ -265,7 +298,7 @@ def popular_dados():
     
     # 5. Criar Orçamentos
     print("📋 Criando orçamentos...")
-    for i in range(30):  # Criar 30 orçamentos
+    for i in range(80):  # Criar 80 orçamentos
         cliente = random.choice(clientes_criados)
         funcionario = random.choice(funcionarios_criados)
         
@@ -319,12 +352,33 @@ def popular_dados():
     print("📦 Criando locações...")
     orcamentos_aprovados = [o for o in orcamentos_criados if o.get("status") == "aprovado"]
     
-    for orcamento in orcamentos_aprovados[:15]:  # Criar até 15 locações
+    # Endereços de entrega em Manaus
+    enderecos_entrega_manaus = [
+        "Av. Djalma Batista, 1650, Chapada - Manaus/AM",
+        "Av. Getúlio Vargas, 845, Centro - Manaus/AM",
+        "Av. Constantino Nery, 2310, Adrianópolis - Manaus/AM",
+        "Av. Torquato Tapajós, 7200, Distrito Industrial - Manaus/AM",
+        "Rua 10 de Julho, 456, Centro - Manaus/AM",
+        "Av. Tancredo Neves, 3500, Flores - Manaus/AM",
+        "Av. Max Teixeira, 1850, Alvorada - Manaus/AM",
+        "Rua Ramos Ferreira, 789, Centro - Manaus/AM",
+        "Av. Paraíba, 1200, Petrópolis - Manaus/AM",
+        "Av. Umberto Calderaro, 2800, Aleixo - Manaus/AM",
+        "Av. Dom Pedro I, 1500, Centro - Manaus/AM",
+        "Rua Recife, 234, Centro - Manaus/AM",
+        "Av. Brasil, 550, Compensa - Manaus/AM",
+        "Av. Autaz Mirim, 8400, Jorge Teixeira - Manaus/AM",
+        "Rua 24 de Maio, 123, Centro - Manaus/AM"
+    ]
+    
+    for orcamento in orcamentos_aprovados[:40]:  # Criar até 40 locações
         funcionario = random.choice(funcionarios_criados)
+        endereco_entrega = random.choice(enderecos_entrega_manaus)
         
         try:
             response = requests.post(
                 f"{API_URL}/locacoes/from-orcamento/{orcamento['id']}",
+                json={"endereco_entrega": endereco_entrega},
                 headers={"X-Funcionario-Username": funcionario["username"]},
                 timeout=10
             )

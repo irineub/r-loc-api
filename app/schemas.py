@@ -109,6 +109,8 @@ class OrcamentoUpdate(BaseModel):
     frete: Optional[float] = Field(None, ge=0)
     total_final: Optional[float] = Field(None, gt=0)
     observacoes: Optional[str] = None
+    itens: Optional[List[ItemOrcamentoCreate]] = None
+    status: Optional[StatusOrcamento] = None
 
 class Orcamento(OrcamentoBase):
     id: int

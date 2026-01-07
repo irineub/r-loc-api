@@ -107,7 +107,7 @@ def devolver_equipamento(db: Session, equipamento_id: int, quantidade: int):
 
 # Orcamento CRUD
 def get_orcamento(db: Session, orcamento_id: int):
-    return db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
+    return db.query(models.Orcamento).options(joinedload(models.Orcamento.locacao)).filter(models.Orcamento.id == orcamento_id).first()
 
 def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Optional[int] = None):
     query = db.query(models.Orcamento)
@@ -141,9 +141,31 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
 def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.OrcamentoUpdate):
     db_orcamento = get_orcamento(db, orcamento_id)
     if db_orcamento:
-        update_data = orcamento.dict(exclude_unset=True)
+        update_data = orcamento.dict(exclude_unset=True, exclude={'itens', 'status'})
         for field, value in update_data.items():
             setattr(db_orcamento, field, value)
+        
+        # Se estava rejeitado e está editando, voltar para pendente
+        # Mas só se não tiver locação gerada
+        if db_orcamento.status == models.StatusOrcamento.REJEITADO and db_orcamento.locacao is None:
+            db_orcamento.status = models.StatusOrcamento.PENDENTE
+        
+        # Atualizar status se fornecido explicitamente
+        if orcamento.status is not None:
+            db_orcamento.status = orcamento.status
+        
+        # Atualizar itens se fornecidos
+        if 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None:
+            # Deletar itens antigos
+            db.query(models.ItemOrcamento).filter(
+                models.ItemOrcamento.orcamento_id == orcamento_id
+            ).delete()
+            
+            # Criar novos itens
+            for item in orcamento.itens:
+                db_item = models.ItemOrcamento(**item.dict(), orcamento_id=orcamento_id)
+                db.add(db_item)
+        
         db.commit()
         db.refresh(db_orcamento)
     return db_orcamento
