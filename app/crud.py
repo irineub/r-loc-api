@@ -122,6 +122,27 @@ def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
     ).offset(skip).limit(limit).all()
 
 def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
+    # Validar estoque antes de criar
+    equipamentos_quantidades = {}
+    for item in orcamento.itens:
+        equipamento_id = item.equipamento_id
+        if equipamento_id not in equipamentos_quantidades:
+            equipamentos_quantidades[equipamento_id] = 0
+        equipamentos_quantidades[equipamento_id] += item.quantidade
+    
+    # Verificar se há estoque suficiente para cada equipamento
+    for equipamento_id, quantidade_total in equipamentos_quantidades.items():
+        db_equipamento = get_equipamento(db, equipamento_id)
+        if not db_equipamento:
+            raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
+        
+        estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+        if quantidade_total > estoque_disponivel:
+            raise ValueError(
+                f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
+                f"Disponível: {estoque_disponivel}, Solicitado: {quantidade_total}"
+            )
+    
     # Create orcamento
     orcamento_data = orcamento.dict(exclude={'itens'})
     db_orcamento = models.Orcamento(**orcamento_data)
@@ -156,6 +177,27 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
         
         # Atualizar itens se fornecidos
         if 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None:
+            # Validar estoque antes de atualizar
+            equipamentos_quantidades = {}
+            for item in orcamento.itens:
+                equipamento_id = item.equipamento_id
+                if equipamento_id not in equipamentos_quantidades:
+                    equipamentos_quantidades[equipamento_id] = 0
+                equipamentos_quantidades[equipamento_id] += item.quantidade
+            
+            # Verificar se há estoque suficiente para cada equipamento
+            for equipamento_id, quantidade_total in equipamentos_quantidades.items():
+                db_equipamento = get_equipamento(db, equipamento_id)
+                if not db_equipamento:
+                    raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
+                
+                estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+                if quantidade_total > estoque_disponivel:
+                    raise ValueError(
+                        f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
+                        f"Disponível: {estoque_disponivel}, Solicitado: {quantidade_total}"
+                    )
+            
             # Deletar itens antigos
             db.query(models.ItemOrcamento).filter(
                 models.ItemOrcamento.orcamento_id == orcamento_id
