@@ -82,6 +82,7 @@ class Orcamento(Base):
     status = Column(Enum(StatusOrcamento), default=StatusOrcamento.PENDENTE)
     observacoes = Column(Text)
     data_criacao = Column(DateTime(timezone=True), server_default=func.now())
+    data_rejeicao = Column(DateTime(timezone=True), nullable=True)  # Data em que o orçamento foi rejeitado
 
     # Relationships
     cliente = relationship("Cliente", back_populates="orcamentos")

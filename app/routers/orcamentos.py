@@ -142,4 +142,10 @@ def read_orcamentos_pendentes(skip: int = 0, limit: int = 100, db: Session = Dep
 @router.get("/aprovados/", response_model=List[schemas.Orcamento])
 def read_orcamentos_aprovados(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all approved orcamentos"""
-    return crud.get_orcamentos_aprovados(db, skip=skip, limit=limit) 
+    return crud.get_orcamentos_aprovados(db, skip=skip, limit=limit)
+
+@router.post("/limpar-rejeitados/")
+def limpar_orcamentos_rejeitados_endpoint(dias: int = 30, db: Session = Depends(get_db)):
+    """Deleta orçamentos rejeitados que foram rejeitados há mais de X dias (padrão: 30 dias)"""
+    quantidade = crud.limpar_orcamentos_rejeitados(db, dias=dias)
+    return {"message": f"{quantidade} orçamento(s) rejeitado(s) deletado(s)", "quantidade": quantidade} 

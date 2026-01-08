@@ -150,10 +150,15 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
     db.commit()
     db.refresh(db_orcamento)
     
-    # Create itens
+    # Create itens e reservar estoque
     for item in orcamento.itens:
         db_item = models.ItemOrcamento(**item.dict(), orcamento_id=db_orcamento.id)
         db.add(db_item)
+        
+        # Reservar estoque para o item (decrementar estoque_alugado)
+        db_equipamento = get_equipamento(db, item.equipamento_id)
+        if db_equipamento:
+            db_equipamento.estoque_alugado += item.quantidade
     
     db.commit()
     db.refresh(db_orcamento)
@@ -177,7 +182,21 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
         
         # Atualizar itens se fornecidos
         if 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None:
-            # Validar estoque antes de atualizar
+            # Buscar itens antigos antes de deletar para liberar estoque
+            itens_antigos = db.query(models.ItemOrcamento).filter(
+                models.ItemOrcamento.orcamento_id == orcamento_id
+            ).all()
+            
+            # Liberar estoque dos itens antigos (só se não tiver locação gerada E não estava rejeitado)
+            # Se estava rejeitado, o estoque já foi liberado quando foi rejeitado
+            if db_orcamento.locacao is None and db_orcamento.status != models.StatusOrcamento.REJEITADO:
+                for item_antigo in itens_antigos:
+                    db_equipamento = get_equipamento(db, item_antigo.equipamento_id)
+                    if db_equipamento:
+                        # Liberar o estoque que estava reservado para este item
+                        db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item_antigo.quantidade)
+            
+            # Calcular quantidades dos novos itens
             equipamentos_quantidades = {}
             for item in orcamento.itens:
                 equipamento_id = item.equipamento_id
@@ -185,7 +204,7 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
                     equipamentos_quantidades[equipamento_id] = 0
                 equipamentos_quantidades[equipamento_id] += item.quantidade
             
-            # Verificar se há estoque suficiente para cada equipamento
+            # Validar estoque antes de atualizar (considerando que já liberamos os itens antigos)
             for equipamento_id, quantidade_total in equipamentos_quantidades.items():
                 db_equipamento = get_equipamento(db, equipamento_id)
                 if not db_equipamento:
@@ -203,10 +222,16 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
                 models.ItemOrcamento.orcamento_id == orcamento_id
             ).delete()
             
-            # Criar novos itens
+            # Criar novos itens e reservar estoque (só se não tiver locação gerada)
             for item in orcamento.itens:
                 db_item = models.ItemOrcamento(**item.dict(), orcamento_id=orcamento_id)
                 db.add(db_item)
+                
+                # Reservar estoque para o novo item (só se não tiver locação gerada)
+                if db_orcamento.locacao is None:
+                    db_equipamento = get_equipamento(db, item.equipamento_id)
+                    if db_equipamento:
+                        db_equipamento.estoque_alugado += item.quantidade
         
         db.commit()
         db.refresh(db_orcamento)
@@ -223,10 +248,47 @@ def aprovar_orcamento(db: Session, orcamento_id: int):
 def rejeitar_orcamento(db: Session, orcamento_id: int):
     db_orcamento = get_orcamento(db, orcamento_id)
     if db_orcamento and db_orcamento.status == StatusOrcamento.PENDENTE:
+        # Liberar estoque dos itens do orçamento rejeitado (só se não tiver locação gerada)
+        if db_orcamento.locacao is None:
+            for item in db_orcamento.itens:
+                db_equipamento = get_equipamento(db, item.equipamento_id)
+                if db_equipamento:
+                    # Liberar o estoque que estava reservado para este item
+                    db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item.quantidade)
+        
         db_orcamento.status = StatusOrcamento.REJEITADO
+        db_orcamento.data_rejeicao = datetime.now()  # Salvar data de rejeição
         db.commit()
         db.refresh(db_orcamento)
     return db_orcamento
+
+def limpar_orcamentos_rejeitados(db: Session, dias: int = 30):
+    """Deleta orçamentos rejeitados que foram rejeitados há mais de X dias"""
+    data_limite = datetime.now() - timedelta(days=dias)
+    
+    # Buscar orçamentos rejeitados há mais de X dias
+    orcamentos_rejeitados = db.query(models.Orcamento).filter(
+        and_(
+            models.Orcamento.status == StatusOrcamento.REJEITADO,
+            models.Orcamento.data_rejeicao.isnot(None),
+            models.Orcamento.data_rejeicao < data_limite,
+            models.Orcamento.locacao == None  # Só deletar se não tiver locação gerada
+        )
+    ).all()
+    
+    quantidade_deletados = 0
+    for orcamento in orcamentos_rejeitados:
+        # Deletar itens do orçamento primeiro
+        db.query(models.ItemOrcamento).filter(
+            models.ItemOrcamento.orcamento_id == orcamento.id
+        ).delete()
+        
+        # Deletar o orçamento
+        db.delete(orcamento)
+        quantidade_deletados += 1
+    
+    db.commit()
+    return quantidade_deletados
 
 # Locacao CRUD
 def get_locacao(db: Session, locacao_id: int):
