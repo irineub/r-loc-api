@@ -22,11 +22,6 @@ CLIENTES_PF = [
     {"nome": "Fernanda Rocha", "cpf": "890.123.456-77", "rg": "89.012.345-6", "email": "fernanda.rocha@email.com", "telefone": "(92) 91098-7654"},
     {"nome": "Rafael Souza", "cpf": "901.234.567-88", "rg": "90.123.456-7", "email": "rafael.souza@email.com", "telefone": "(92) 99988-7766"},
     {"nome": "Patricia Lima", "cpf": "012.345.678-99", "rg": "01.234.567-8", "email": "patricia.lima@email.com", "telefone": "(92) 98877-6655"},
-    {"nome": "Bruno Martins", "cpf": "111.222.333-44", "rg": "11.222.333-4", "email": "bruno.martins@email.com", "telefone": "(92) 97766-5544"},
-    {"nome": "Camila Rodrigues", "cpf": "222.333.444-55", "rg": "22.333.444-5", "email": "camila.rodrigues@email.com", "telefone": "(92) 96655-4433"},
-    {"nome": "Thiago Almeida", "cpf": "333.444.555-66", "rg": "33.444.555-6", "email": "thiago.almeida@email.com", "telefone": "(92) 95544-3322"},
-    {"nome": "Larissa Barbosa", "cpf": "444.555.666-77", "rg": "44.555.666-7", "email": "larissa.barbosa@email.com", "telefone": "(92) 94433-2211"},
-    {"nome": "André Pereira", "cpf": "555.666.777-88", "rg": "55.666.777-8", "email": "andre.pereira@email.com", "telefone": "(92) 93322-1100"},
 ]
 
 CLIENTES_PJ = [
@@ -40,8 +35,6 @@ CLIENTES_PJ = [
     {"nome": "Engenharia e Projetos", "cnpj": "89.012.345/0001-67", "ie": "890.123.456.789", "email": "contato@engenharia.com.br", "telefone": "(92) 3456-7897"},
     {"nome": "Amazônia Construções", "cnpj": "90.123.456/0001-78", "ie": "901.234.567.890", "email": "contato@amazonia.com.br", "telefone": "(92) 3344-5566"},
     {"nome": "Rio Negro Obras", "cnpj": "01.234.567/0001-89", "ie": "012.345.678.901", "email": "contato@rionegro.com.br", "telefone": "(92) 3234-5678"},
-    {"nome": "Manaus Engenharia", "cnpj": "11.111.222/0001-33", "ie": "111.222.333.444", "email": "contato@manauseng.com.br", "telefone": "(92) 3123-4567"},
-    {"nome": "Amazonas Construtora", "cnpj": "22.222.333/0001-44", "ie": "222.333.444.555", "email": "contato@amazonascon.com.br", "telefone": "(92) 3012-3456"},
 ]
 
 EQUIPAMENTOS = [
@@ -53,20 +46,10 @@ EQUIPAMENTOS = [
     {"descricao": "Gerador 15 KVA", "unidade": "UN", "preco": 350.0, "estoque": 12},
     {"descricao": "Andaime Tubular 2x1m", "unidade": "M²", "preco": 8.0, "estoque": 500},
     {"descricao": "Escora Metálica", "unidade": "UN", "preco": 25.0, "estoque": 200},
-    {"descricao": "Cimbramento", "unidade": "M²", "preco": 12.0, "estoque": 300},
-    {"descricao": "Fôrma de Madeira", "unidade": "M²", "preco": 15.0, "estoque": 400},
-    {"descricao": "Cortadora de Piso", "unidade": "UN", "preco": 80.0, "estoque": 15},
-    {"descricao": "Furadeira de Impacto", "unidade": "UN", "preco": 45.0, "estoque": 30},
-    {"descricao": "Serra Circular", "unidade": "UN", "preco": 60.0, "estoque": 20},
-    {"descricao": "Martelete Demolidor", "unidade": "UN", "preco": 180.0, "estoque": 10},
     # Equipamentos com estoque BAIXO para testar validação
     {"descricao": "Gerador 30 KVA", "unidade": "UN", "preco": 500.0, "estoque": 1},  # Estoque baixo para testar
     {"descricao": "Rolo Compactador", "unidade": "UN", "preco": 400.0, "estoque": 2},  # Estoque baixo
-    {"descricao": "Plataforma Elevatória 12m", "unidade": "UN", "preco": 600.0, "estoque": 1},  # Estoque baixo
     {"descricao": "Plataforma Elevatória 18m", "unidade": "UN", "preco": 850.0, "estoque": 2},  # Estoque baixo
-    {"descricao": "Caminhão Munck", "unidade": "UN", "preco": 1200.0, "estoque": 1},  # Estoque baixo
-    {"descricao": "Retroescavadeira", "unidade": "UN", "preco": 1500.0, "estoque": 1},  # Estoque baixo
-    {"descricao": "Bobcat", "unidade": "UN", "preco": 800.0, "estoque": 2},  # Estoque baixo
 ]
 
 FUNCIONARIOS = [
@@ -245,25 +228,61 @@ def popular_dados():
     orcamentos_criados = []
     locacoes_criadas = []
     
-    # 1. Criar Funcionários
-    print("👨‍💼 Criando funcionários...")
-    for func_data in FUNCIONARIOS:
-        try:
-            response = requests.post(
-                f"{API_URL}/funcionarios/",
-                json=criar_funcionario(func_data),
-                timeout=10
-            )
-            if response.status_code in [200, 201]:
-                func = response.json()
-                funcionarios_criados.append(func)
-                print(f"  ✅ {func['nome']} ({func['username']})")
-            else:
-                print(f"  ❌ Erro ao criar {func_data['nome']}: {response.status_code}")
-        except Exception as e:
-            print(f"  ❌ Erro ao criar {func_data['nome']}: {e}")
+    # 1. Criar ou buscar Funcionários
+    print("👨‍💼 Criando ou buscando funcionários...")
     
-    print(f"\n✅ {len(funcionarios_criados)} funcionários criados\n")
+    # Primeiro, tentar buscar funcionários existentes
+    try:
+        # Tentar buscar com usuário master (assumindo que existe "rloc" ou similar)
+        response = requests.get(
+            f"{API_URL}/funcionarios/",
+            headers={"X-Funcionario-Username": "rloc"},
+            timeout=10
+        )
+        if response.status_code == 200:
+            funcionarios_existentes = response.json()
+            if funcionarios_existentes:
+                funcionarios_criados = funcionarios_existentes[:5]  # Usar até 5 existentes
+                print(f"  ✅ Encontrados {len(funcionarios_criados)} funcionários existentes")
+                for func in funcionarios_criados:
+                    print(f"    - {func.get('nome', 'N/A')} ({func.get('username', 'N/A')})")
+    except Exception as e:
+        print(f"  ⚠️  Não foi possível buscar funcionários existentes: {e}")
+    
+    # Se não encontrou funcionários, tentar criar (requer autenticação master)
+    if not funcionarios_criados:
+        print("  📝 Tentando criar novos funcionários...")
+        for func_data in FUNCIONARIOS:
+            try:
+                response = requests.post(
+                    f"{API_URL}/funcionarios/",
+                    json=criar_funcionario(func_data),
+                    headers={"X-Funcionario-Username": "rloc"},  # Tentar com usuário master
+                    timeout=10
+                )
+                if response.status_code in [200, 201]:
+                    func = response.json()
+                    funcionarios_criados.append(func)
+                    print(f"  ✅ {func['nome']} ({func['username']})")
+                else:
+                    error_detail = ""
+                    try:
+                        error_detail = response.json().get('detail', '')
+                    except Exception:
+                        error_detail = response.text[:100]
+                    print(f"  ❌ Erro ao criar {func_data['nome']}: {response.status_code} - {error_detail}")
+            except Exception as e:
+                print(f"  ❌ Erro ao criar {func_data['nome']}: {e}")
+    
+    # Se ainda não tem funcionários, usar um username padrão
+    if not funcionarios_criados:
+        print("  ⚠️  Nenhum funcionário encontrado ou criado.")
+        print("  ℹ️  O script continuará usando 'rloc' como username padrão nos headers.")
+        print("  ℹ️  Certifique-se de que existe um usuário 'rloc' no sistema ou ajuste o script.")
+        # Criar um funcionário fictício para usar nos headers
+        funcionarios_criados = [{"username": "rloc", "nome": "Sistema (rloc)", "id": 0}]
+    
+    print(f"\n✅ {len(funcionarios_criados)} funcionário(s) disponível(is) para uso\n")
     
     # 2. Criar Clientes PF
     print("👥 Criando clientes (Pessoa Física)...")
@@ -329,9 +348,14 @@ def popular_dados():
     
     print(f"\n✅ {len(equipamentos_criados)} equipamentos criados\n")
     
-    if not equipamentos_criados or not clientes_criados or not funcionarios_criados:
+    if not equipamentos_criados or not clientes_criados:
         print("❌ Não foi possível criar dados suficientes. Abortando criação de orçamentos.")
         return
+    
+    # Se não há funcionários, criar um funcionário padrão para usar nos headers
+    if not funcionarios_criados:
+        print("⚠️  Nenhum funcionário encontrado. Usando 'rloc' como padrão para headers.")
+        funcionarios_criados = [{"username": "rloc", "nome": "Sistema", "id": 0}]
     
     equipamentos_ids = [e["id"] for e in equipamentos_criados]
     
@@ -340,7 +364,7 @@ def popular_dados():
     
     # Criar orçamentos pendentes (30%)
     print("\n  📝 Criando orçamentos PENDENTES (editáveis)...")
-    for i in range(25):
+    for i in range(10):
         cliente = random.choice(clientes_criados)
         funcionario = random.choice(funcionarios_criados)
         
@@ -377,7 +401,7 @@ def popular_dados():
     
     # Criar orçamentos aprovados SEM contrato (30%) - editáveis
     print("\n  ✅ Criando orçamentos APROVADOS (sem contrato, editáveis)...")
-    for i in range(25):
+    for i in range(10):
         cliente = random.choice(clientes_criados)
         funcionario = random.choice(funcionarios_criados)
         
@@ -416,7 +440,7 @@ def popular_dados():
     
     # Criar orçamentos rejeitados (20%) - editáveis (voltam a pendente ao editar)
     print("\n  ❌ Criando orçamentos REJEITADOS (editáveis, voltam a pendente)...")
-    for i in range(15):
+    for i in range(10):
         cliente = random.choice(clientes_criados)
         funcionario = random.choice(funcionarios_criados)
         
@@ -455,7 +479,7 @@ def popular_dados():
     
     # Criar orçamentos aprovados COM contrato (20%) - NÃO editáveis
     print("\n  📦 Criando orçamentos APROVADOS (com contrato, NÃO editáveis)...")
-    for i in range(15):
+    for i in range(10):
         cliente = random.choice(clientes_criados)
         funcionario = random.choice(funcionarios_criados)
         
@@ -519,7 +543,7 @@ def popular_dados():
     
     # Criar locações apenas para os últimos orçamentos aprovados (os que foram marcados para ter contrato)
     # Isso garante que alguns orçamentos aprovados tenham contrato (não editáveis) e outros não (editáveis)
-    orcamentos_para_contrato = orcamentos_aprovados_sem_contrato[-15:] if len(orcamentos_aprovados_sem_contrato) >= 15 else orcamentos_aprovados_sem_contrato
+    orcamentos_para_contrato = orcamentos_aprovados_sem_contrato[-10:] if len(orcamentos_aprovados_sem_contrato) >= 10 else orcamentos_aprovados_sem_contrato
     
     for orcamento in orcamentos_para_contrato:
         funcionario = random.choice(funcionarios_criados)

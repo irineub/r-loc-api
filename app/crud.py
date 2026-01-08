@@ -122,7 +122,7 @@ def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
     ).offset(skip).limit(limit).all()
 
 def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
-    # Validar estoque antes de criar
+    # Agrupar quantidades por equipamento
     equipamentos_quantidades = {}
     for item in orcamento.itens:
         equipamento_id = item.equipamento_id
@@ -130,15 +130,19 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
             equipamentos_quantidades[equipamento_id] = 0
         equipamentos_quantidades[equipamento_id] += item.quantidade
     
-    # Verificar se há estoque suficiente para cada equipamento
-    for equipamento_id, quantidade_total in equipamentos_quantidades.items():
+    # Verificar se todos os equipamentos existem
+    equipamentos_db = {}
+    for equipamento_id in equipamentos_quantidades.keys():
         db_equipamento = get_equipamento(db, equipamento_id)
         if not db_equipamento:
             raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
-        
+        equipamentos_db[equipamento_id] = db_equipamento
+    
+    # Validar estoque ANTES de criar qualquer coisa (primeira validação)
+    for equipamento_id, quantidade_total in equipamentos_quantidades.items():
+        db_equipamento = equipamentos_db[equipamento_id]
         estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
         
-        # Validar se há estoque disponível
         if estoque_disponivel <= 0:
             raise ValueError(
                 f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
@@ -151,23 +155,41 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
                 f"Disponível: {estoque_disponivel}, Solicitado: {quantidade_total}"
             )
     
-    # Create orcamento
+    # Criar orçamento
     orcamento_data = orcamento.dict(exclude={'itens'})
     db_orcamento = models.Orcamento(**orcamento_data)
     db.add(db_orcamento)
-    db.commit()
-    db.refresh(db_orcamento)
+    db.flush()  # Flush para obter o ID sem commit
     
-    # Create itens e reservar estoque
+    # Criar itens e reservar estoque (com validação final antes de reservar)
     for item in orcamento.itens:
+        # Revalidar estoque ANTES de reservar (evita race condition)
+        db_equipamento = db.query(models.Equipamento).filter(
+            models.Equipamento.id == item.equipamento_id
+        ).with_for_update().first()  # Lock pessimista para evitar race condition
+        
+        if not db_equipamento:
+            db.rollback()
+            raise ValueError(f"Equipamento ID {item.equipamento_id} não encontrado durante a reserva")
+        
+        estoque_disponivel_atual = db_equipamento.estoque - db_equipamento.estoque_alugado
+        
+        if estoque_disponivel_atual < item.quantidade:
+            db.rollback()
+            raise ValueError(
+                f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}' durante a reserva. "
+                f"Disponível: {estoque_disponivel_atual}, Solicitado: {item.quantidade}. "
+                f"O estoque pode ter sido reservado por outro orçamento."
+            )
+        
+        # Criar item
         db_item = models.ItemOrcamento(**item.dict(), orcamento_id=db_orcamento.id)
         db.add(db_item)
         
-        # Reservar estoque para o item (decrementar estoque_alugado)
-        db_equipamento = get_equipamento(db, item.equipamento_id)
-        if db_equipamento:
-            db_equipamento.estoque_alugado += item.quantidade
+        # Reservar estoque (incrementar estoque_alugado)
+        db_equipamento.estoque_alugado += item.quantidade
     
+    # Commit final (tudo ou nada)
     db.commit()
     db.refresh(db_orcamento)
     return db_orcamento
