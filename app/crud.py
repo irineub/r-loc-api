@@ -137,6 +137,14 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
             raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
         
         estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+        
+        # Validar se há estoque disponível
+        if estoque_disponivel <= 0:
+            raise ValueError(
+                f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
+                f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, Disponível: {estoque_disponivel}"
+            )
+        
         if quantidade_total > estoque_disponivel:
             raise ValueError(
                 f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
@@ -211,6 +219,14 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
                     raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
                 
                 estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+                
+                # Validar se há estoque disponível
+                if estoque_disponivel <= 0:
+                    raise ValueError(
+                        f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
+                        f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, Disponível: {estoque_disponivel}"
+                    )
+                
                 if quantidade_total > estoque_disponivel:
                     raise ValueError(
                         f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
