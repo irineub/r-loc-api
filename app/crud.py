@@ -195,14 +195,13 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
                 models.ItemOrcamento.orcamento_id == orcamento_id
             ).all()
             
-            # Liberar estoque dos itens antigos (só se não tiver locação gerada E não estava rejeitado)
-            # Se estava rejeitado, o estoque já foi liberado quando foi rejeitado
-            if db_orcamento.locacao is None and db_orcamento.status != models.StatusOrcamento.REJEITADO:
-                for item_antigo in itens_antigos:
-                    db_equipamento = get_equipamento(db, item_antigo.equipamento_id)
-                    if db_equipamento:
-                        # Liberar o estoque que estava reservado para este item
-                        db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item_antigo.quantidade)
+            # Calcular quantidades dos itens antigos por equipamento
+            equipamentos_antigos_quantidades = {}
+            for item_antigo in itens_antigos:
+                equipamento_id = item_antigo.equipamento_id
+                if equipamento_id not in equipamentos_antigos_quantidades:
+                    equipamentos_antigos_quantidades[equipamento_id] = 0
+                equipamentos_antigos_quantidades[equipamento_id] += item_antigo.quantidade
             
             # Calcular quantidades dos novos itens
             equipamentos_quantidades = {}
@@ -212,26 +211,41 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
                     equipamentos_quantidades[equipamento_id] = 0
                 equipamentos_quantidades[equipamento_id] += item.quantidade
             
-            # Validar estoque antes de atualizar (considerando que já liberamos os itens antigos)
+            # Validar estoque ANTES de liberar os itens antigos
+            # Precisamos considerar que os itens antigos já estão reservados e serão liberados
             for equipamento_id, quantidade_total in equipamentos_quantidades.items():
                 db_equipamento = get_equipamento(db, equipamento_id)
                 if not db_equipamento:
                     raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
                 
-                estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+                # Calcular estoque disponível considerando que os itens antigos serão liberados
+                quantidade_antiga = equipamentos_antigos_quantidades.get(equipamento_id, 0)
+                # O estoque disponível atual + a quantidade que será liberada dos itens antigos
+                estoque_disponivel_atual = db_equipamento.estoque - db_equipamento.estoque_alugado
+                estoque_disponivel_apos_liberacao = estoque_disponivel_atual + quantidade_antiga
                 
-                # Validar se há estoque disponível
-                if estoque_disponivel <= 0:
+                # Validar se há estoque disponível após liberar os itens antigos
+                if estoque_disponivel_apos_liberacao <= 0:
                     raise ValueError(
                         f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
-                        f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, Disponível: {estoque_disponivel}"
+                        f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, "
+                        f"Disponível atual: {estoque_disponivel_atual}, Após liberar itens antigos: {estoque_disponivel_apos_liberacao}"
                     )
                 
-                if quantidade_total > estoque_disponivel:
+                if quantidade_total > estoque_disponivel_apos_liberacao:
                     raise ValueError(
                         f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
-                        f"Disponível: {estoque_disponivel}, Solicitado: {quantidade_total}"
+                        f"Disponível após liberar itens antigos: {estoque_disponivel_apos_liberacao}, Solicitado: {quantidade_total}"
                     )
+            
+            # Agora sim, liberar estoque dos itens antigos (só se não tiver locação gerada E não estava rejeitado)
+            # Se estava rejeitado, o estoque já foi liberado quando foi rejeitado
+            if db_orcamento.locacao is None and db_orcamento.status != models.StatusOrcamento.REJEITADO:
+                for item_antigo in itens_antigos:
+                    db_equipamento = get_equipamento(db, item_antigo.equipamento_id)
+                    if db_equipamento:
+                        # Liberar o estoque que estava reservado para este item
+                        db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item_antigo.quantidade)
             
             # Deletar itens antigos
             db.query(models.ItemOrcamento).filter(
