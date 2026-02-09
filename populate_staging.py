@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 
 # URL da API (alterar para staging quando necessário)
-# API_URL = "http://localhost:8000"
-API_URL = "https://srv938431.hstgr.cloud/api"
+API_URL = "http://localhost:8000/api"
+# API_URL = "https://srv938431.hstgr.cloud/api"
 # Dados realistas para geração
 CLIENTES_PF = [
     {"nome": "João Silva", "cpf": "123.456.789-00", "rg": "12.345.678-9", "email": "joao.silva@email.com", "telefone": "(92) 98765-4321"},
@@ -620,7 +620,132 @@ def popular_dados():
     print("   ✓ Orçamentos rejeitados (editáveis, voltam a pendente ao editar)")
     print("\n🌐 Acesse: https://srv938431.hstgr.cloud/")
 
+
+def criar_cenario_bug():
+    """
+    Cria o cenário específico relatado pelo usuário para reprodução do bug
+    """
+    print("\n" + "=" * 60)
+    print("🐛 CRIANDO CENÁRIO DE REPRODUÇÃO DO BUG")
+    print("=" * 60)
+    
+    # 1. Obter headers de autenticação
+    headers = {"X-Funcionario-Username": "rloc"}
+    
+    # 2. Buscar ou criar Cliente Patricia Lima
+    print("1. Buscando Cliente Patricia Lima...")
+    cliente_id = None
+    try:
+        response = requests.get(f"{API_URL}/clientes/", headers=headers, timeout=10)
+        if response.status_code == 200:
+            clientes = response.json()
+            for c in clientes:
+                if "Patricia Lima" in c.get("nome_razao_social", ""):
+                    cliente_id = c["id"]
+                    print(f"   ✅ Cliente encontrado: {c['nome_razao_social']} (ID {cliente_id})")
+                    break
+    except Exception:
+        pass
+        
+    if not cliente_id:
+        print("   ⚠️ Cliente não encontrado. Criando...")
+        patricia_data = {"nome": "Patricia Lima", "cpf": "012.345.678-99", "rg": "01.234.567-8", "email": "patricia.lima@email.com", "telefone": "(92) 98877-6655"}
+        try:
+             response = requests.post(f"{API_URL}/clientes/", json=criar_cliente_pf(patricia_data), headers=headers, timeout=10)
+             if response.status_code in [200, 201]:
+                 cliente_id = response.json()["id"]
+                 print(f"   ✅ Cliente criado: ID {cliente_id}")
+        except Exception as e:
+            print(f"   ❌ Erro ao criar cliente: {e}")
+            return
+
+    # 3. Buscar Equipamentos
+    print("\n2. Identificando equipamentos...")
+    betoneira_id = None
+    guincho_id = None
+    betoneira_preco = 0
+    guincho_preco = 0
+    
+    try:
+        response = requests.get(f"{API_URL}/equipamentos/", headers=headers, timeout=10)
+        if response.status_code == 200:
+            equips = response.json()
+            for e in equips:
+                if "Betoneira 500L" in e["descricao"]:
+                    betoneira_id = e["id"]
+                    betoneira_preco = e.get("preco_quinzenal", 0)
+                elif "Guincho Elétrico 1 Ton" in e["descricao"]:
+                    guincho_id = e["id"]
+                    guincho_preco = e.get("preco_quinzenal", 0)
+    except Exception:
+        pass
+
+    if not betoneira_id or not guincho_id:
+        print(f"   ❌ Equipamentos não encontrados")
+        return
+
+    # 4. Criar Orçamento
+    print("\n3. Criando Orçamento Patricia Lima...")
+    
+    data_inicio = datetime.now()
+    data_fim = data_inicio + timedelta(days=17)
+    
+    # Calculo manual para validar
+    # Quinzenal (17 dias) = 2 periodos
+    sub_betoneira = 2 * betoneira_preco * 2 
+    sub_guincho = 1 * guincho_preco * 2
+    total_itens = sub_betoneira + sub_guincho
+    
+    desconto = total_itens * 0.10 # 10% de desconto (~1275)
+    frete = 50.0
+    total_final = total_itens - desconto + frete
+    
+    print(f"   💰 Total Itens: {total_itens:.2f}")
+    print(f"   💰 Desconto: {desconto:.2f}")
+    print(f"   💰 Total Final: {total_final:.2f}")
+    
+    itens_payload = [
+        {
+            "equipamento_id": betoneira_id,
+            "quantidade": 2,
+            "preco_unitario": betoneira_preco, 
+            "dias": 17,
+            "tipo_cobranca": "quinzenal",
+            "subtotal": sub_betoneira
+        },
+        {
+            "equipamento_id": guincho_id,
+            "quantidade": 1,
+            "preco_unitario": guincho_preco,
+            "dias": 17,
+            "tipo_cobranca": "quinzenal",
+            "subtotal": sub_guincho
+        }
+    ]
+    
+    orcamento_payload = {
+        "cliente_id": cliente_id,
+        "data_inicio": data_inicio.isoformat(),
+        "data_fim": data_fim.isoformat(),
+        "desconto": desconto,
+        "frete": frete,
+        "total_final": total_final,
+        "observacoes": "Reproduction Scenario",
+        "itens": itens_payload
+    }
+    
+    try:
+        response = requests.post(f"{API_URL}/orcamentos/", json=orcamento_payload, headers=headers, timeout=10)
+        if response.status_code in [200, 201]:
+            orc = response.json()
+            print(f"   ✅ Orçamento criado ID {orc['id']}")
+        else:
+            print(f"   ❌ Erro ao criar: {response.text}")
+    except Exception as e:
+        print(f"   ❌ Erro: {e}")
+
 if __name__ == "__main__":
     popular_dados()
+    criar_cenario_bug()
 
 
