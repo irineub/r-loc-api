@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 
 # URL da API (alterar para staging quando necessário)
-API_URL = "http://localhost:8000/api"
+API_URL = "http://137.131.201.11/api/api"
 # API_URL = "https://srv938431.hstgr.cloud/api"
 # Dados realistas para geração
 CLIENTES_PF = [
