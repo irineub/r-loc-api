@@ -1,8 +1,12 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app.models import Base
-from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionarios, logs
+from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionarios, logs, upload, config, pdf
+
+# ... existing code ...
+
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -14,6 +18,9 @@ app = FastAPI(
     openapi_version="3.1.0",
 )
 
+# Mount uploads directory
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +31,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    print(f"Erro não tratado: {exc}")
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Erro interno do servidor"},
+    )
+
 # Include routers
 app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
 app.include_router(equipamentos.router, prefix="/equipamentos", tags=["Equipamentos"])
@@ -31,6 +58,9 @@ app.include_router(orcamentos.router, prefix="/orcamentos", tags=["Orçamentos"]
 app.include_router(locacoes.router, prefix="/locacoes", tags=["Locações"])
 app.include_router(funcionarios.router, prefix="/funcionarios", tags=["Funcionários"])
 app.include_router(logs.router, prefix="/logs", tags=["Logs"])
+app.include_router(upload.router, tags=["Upload"])
+app.include_router(config.router, tags=["Config"])
+app.include_router(pdf.router, prefix="/pdf", tags=["PDF"])
 
 @app.get("/")
 async def root():

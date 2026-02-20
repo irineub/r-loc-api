@@ -98,6 +98,8 @@ class ItemOrcamento(Base):
     quantidade = Column(Integer, nullable=False)
     preco_unitario = Column(Float, nullable=False)
     dias = Column(Integer, nullable=False)
+    data_inicio = Column(DateTime, nullable=True)
+    data_fim = Column(DateTime, nullable=True)
     tipo_cobranca = Column(Enum('diaria', 'semanal', 'quinzenal', 'mensal', name='tipo_cobranca_item'), nullable=False, default='diaria')
     subtotal = Column(Float, nullable=False)
 
@@ -135,6 +137,8 @@ class ItemLocacao(Base):
     quantidade_devolvida = Column(Integer, nullable=False, default=0)
     preco_unitario = Column(Float, nullable=False)
     dias = Column(Integer, nullable=False)
+    data_inicio = Column(DateTime, nullable=True)
+    data_fim = Column(DateTime, nullable=True)
     subtotal = Column(Float, nullable=False)
 
     # Relationships

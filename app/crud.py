@@ -7,6 +7,7 @@ from app.models import StatusOrcamento, StatusLocacao
 from app.models import Equipamento, StatusOrcamento
 from app.schemas import EquipamentoCreate, EquipamentoUpdate
 from typing import Dict
+from app.utils import get_current_time
 
 # Cliente CRUD
 def get_cliente(db: Session, cliente_id: int):
@@ -16,7 +17,9 @@ def get_clientes(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Cliente).offset(skip).limit(limit).all()
 
 def create_cliente(db: Session, cliente: schemas.ClienteCreate):
-    db_cliente = models.Cliente(**cliente.dict())
+    cliente_data = cliente.dict()
+    cliente_data["data_cadastro"] = get_current_time()
+    db_cliente = models.Cliente(**cliente_data)
     db.add(db_cliente)
     db.commit()
     db.refresh(db_cliente)
@@ -157,6 +160,7 @@ def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
     
     # Criar orçamento
     orcamento_data = orcamento.dict(exclude={'itens'})
+    orcamento_data["data_criacao"] = get_current_time()
     db_orcamento = models.Orcamento(**orcamento_data)
     db.add(db_orcamento)
     db.flush()  # Flush para obter o ID sem commit
@@ -201,6 +205,8 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
         for field, value in update_data.items():
             setattr(db_orcamento, field, value)
         
+        old_status = db_orcamento.status
+        
         # Se estava rejeitado e está editando, voltar para pendente
         # Mas só se não tiver locação gerada
         if db_orcamento.status == models.StatusOrcamento.REJEITADO and db_orcamento.locacao is None:
@@ -209,6 +215,25 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
         # Atualizar status se fornecido explicitamente
         if orcamento.status is not None:
             db_orcamento.status = orcamento.status
+            
+        # Determinar se houve reativação (REJEITADO -> outra coisa)
+        # Se foi reativado e NÃO vamos mexer nos itens (abaixo), precisamos reservar o estoque dos itens existentes
+        is_reactivated = (old_status == models.StatusOrcamento.REJEITADO and 
+                          db_orcamento.status != models.StatusOrcamento.REJEITADO)
+        
+        has_new_items = 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None
+        
+        if is_reactivated and not has_new_items:
+             # Re-reservar estoque dos itens existentes
+             for item in db_orcamento.itens:
+                 db_equipamento = get_equipamento(db, item.equipamento_id)
+                 if db_equipamento:
+                     # Verificar disponibilidade antes de reservar
+                     estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+                     if estoque_disponivel < item.quantidade:
+                         raise ValueError(f"Estoque insuficiente ao reativar orçamento para {db_equipamento.descricao}")
+                     
+                     db_equipamento.estoque_alugado += item.quantidade
         
         # Atualizar itens se fornecidos
         if 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None:
@@ -309,14 +334,14 @@ def rejeitar_orcamento(db: Session, orcamento_id: int):
                     db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item.quantidade)
         
         db_orcamento.status = StatusOrcamento.REJEITADO
-        db_orcamento.data_rejeicao = datetime.now()  # Salvar data de rejeição
+        db_orcamento.data_rejeicao = get_current_time()  # Salvar data de rejeição
         db.commit()
         db.refresh(db_orcamento)
     return db_orcamento
 
 def limpar_orcamentos_rejeitados(db: Session, dias: int = 30):
     """Deleta orçamentos rejeitados que foram rejeitados há mais de X dias"""
-    data_limite = datetime.now() - timedelta(days=dias)
+    data_limite = get_current_time() - timedelta(days=dias)
     
     # Buscar orçamentos rejeitados há mais de X dias
     orcamentos_rejeitados = db.query(models.Orcamento).filter(
@@ -382,24 +407,41 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
         "data_fim": orcamento.data_fim,
         "total_final": orcamento.total_final,
         "status": "ativa",
-        "endereco_entrega": endereco_entrega
+        "endereco_entrega": endereco_entrega,
+        "data_criacao": get_current_time()
     }
     
     db_locacao = models.Locacao(**locacao_data)
     db.add(db_locacao)
-    db.commit()
+    db.flush() # Flush para obter o ID sem commit
     db.refresh(db_locacao)
     
     # Criar itens da locação baseados nos itens do orçamento
     for item_orcamento in orcamento.itens:
         equipamento = get_equipamento(db, item_orcamento.equipamento_id)
         if not equipamento:
+            db.rollback()
             raise ValueError(f"Equipamento {item_orcamento.equipamento_id} não encontrado")
         
         # Verificar disponibilidade
         estoque_disponivel = equipamento.estoque - equipamento.estoque_alugado
-        if estoque_disponivel < item_orcamento.quantidade:
-            raise ValueError(f"Estoque insuficiente para {equipamento.descricao}. Disponível: {estoque_disponivel}, Solicitado: {item_orcamento.quantidade}")
+        # Nota: Como o orçamento já reservou o estoque, tecnicamente o estoque_disponivel conta com essa reserva.
+        # Se o item do orçamento está reservado, ele está em estoque_alugado.
+        # Então se fizermos estoque - estoque_alugado, a quantidade do nosso item JÁ está subtraída?
+        # Sim. Se o orçamento reservou 5, estoque 10 -> alugado 5 -> disponivel 5.
+        # Mas para ESTA locação, queremos usar aqueles 5 reservados.
+        # Então a validação abaixo iria falhar se tentássemos alugar mais do que o restante.
+        # MAS, estamos convertendo O PRÓPRIO orçamento.
+        # Então a validação abaixo está incorreta se bloquear.
+        # Se 'estoque_disponivel' é o que sobra ALÉM da nossa reserva, então OK verificar se é < 0?
+        # Não. A verificação correta seria: (estoque - (estoque_alugado - item.quantidade)) < item.quantidade
+        # Ou simplesmente confiar na reserva do orçamento.
+        # REMOVENDO VALIDAÇÃO REDUNDANTE QUE PODE FALHAR FALSAMENTE
+        # (Já que o orçamento aprovado garante a reserva)
+        
+        if estoque_disponivel < 0: # Apenas sanidade grave
+             db.rollback()
+             raise ValueError(f"Estoque inconsistente para {equipamento.descricao}")
         
         # Criar item da locação
         item_locacao_data = {
@@ -409,14 +451,15 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
             "quantidade_devolvida": 0,
             "preco_unitario": item_orcamento.preco_unitario,
             "dias": item_orcamento.dias,
-            "subtotal": item_orcamento.subtotal
+            "subtotal": item_orcamento.subtotal,
+            "data_inicio": item_orcamento.data_inicio,
+            "data_fim": item_orcamento.data_fim
         }
         
         db_item_locacao = models.ItemLocacao(**item_locacao_data)
         db.add(db_item_locacao)
         
-        # Atualizar estoque do equipamento
-        equipamento.estoque_alugado += item_orcamento.quantidade
+        # O estoque já foi reservado quando o orçamento foi criado/aprovado.
     
     db.commit()
     return db_locacao
@@ -440,10 +483,19 @@ def finalizar_locacao(db: Session, locacao_id: int):
     if locacao.status != StatusLocacao.ATIVA:
         raise ValueError("Apenas locações ativas podem ser finalizadas")
     
-    # Estoque deve ser ajustado no ato do recebimento (devolução parcial ou total)
-    
+    # Estoque sustenta a locação. Se finalizar, devolver tudo que não foi devolvido ainda.
+    for item in locacao.itens:
+        pendente = item.quantidade - (item.quantidade_devolvida or 0)
+        if pendente > 0:
+            db_equipamento = get_equipamento(db, item.equipamento_id)
+            if db_equipamento:
+                # Devolve ao estoque (decrementa alugado)
+                db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - pendente)
+            # Atualiza item como devolvido
+            item.quantidade_devolvida = item.quantidade
+
     locacao.status = StatusLocacao.FINALIZADA
-    locacao.data_devolucao = datetime.now()
+    locacao.data_devolucao = get_current_time()
     
     db.commit()
     return locacao
@@ -457,7 +509,14 @@ def cancelar_locacao(db: Session, locacao_id: int):
     if locacao.status != StatusLocacao.ATIVA:
         raise ValueError("Apenas locações ativas podem ser canceladas")
     
-    # Estoque deve ser ajustado separadamente caso haja devolução
+    # Estoque deve ser ajustado separadamente caso haja devolução -> CORREÇÃO: Liberar o estoque reservado.
+    for item in locacao.itens:
+        pendente = item.quantidade - (item.quantidade_devolvida or 0)
+        if pendente > 0:
+            db_equipamento = get_equipamento(db, item.equipamento_id)
+            if db_equipamento:
+                # Devolve ao estoque (decrementa alugado)
+                db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - pendente)
     
     locacao.status = StatusLocacao.CANCELADA
     
@@ -501,7 +560,7 @@ def calcular_subtotal(quantidade: int, preco_unitario: float, dias: int) -> floa
 
 def get_locacoes_atrasadas(db: Session):
     """Get all overdue locacoes"""
-    hoje = datetime.now()
+    hoje = get_current_time()
     return db.query(models.Locacao).filter(
         and_(
             models.Locacao.status == StatusLocacao.ATIVA,
@@ -533,7 +592,8 @@ def create_funcionario(db: Session, funcionario: schemas.FuncionarioCreate):
         username=funcionario.username,
         senha_hash=senha_hash,
         nome=funcionario.nome,
-        ativo=funcionario.ativo
+        ativo=funcionario.ativo,
+        data_cadastro=get_current_time()
     )
     db.add(db_funcionario)
     db.commit()
@@ -580,7 +640,8 @@ def create_log(db: Session, funcionario_id: Optional[int], funcionario_username:
         acao=acao,
         entidade=entidade,
         entidade_id=entidade_id,
-        detalhes=detalhes
+        detalhes=detalhes,
+        data_hora=get_current_time()
     )
     db.add(log)
     db.commit()
@@ -588,11 +649,17 @@ def create_log(db: Session, funcionario_id: Optional[int], funcionario_username:
     return log
 
 def get_logs(db: Session, skip: int = 0, limit: int = 100, 
-             funcionario_id: Optional[int] = None, entidade: Optional[str] = None):
+             funcionario_id: Optional[int] = None, entidade: Optional[str] = None,
+             data_inicio: Optional[datetime] = None, data_fim: Optional[datetime] = None):
     """Busca logs de auditoria com filtros opcionais"""
     query = db.query(models.LogAuditoria)
     if funcionario_id:
         query = query.filter(models.LogAuditoria.funcionario_id == funcionario_id)
     if entidade:
         query = query.filter(models.LogAuditoria.entidade == entidade)
+    if data_inicio:
+        query = query.filter(models.LogAuditoria.data_hora >= data_inicio)
+    if data_fim:
+        query = query.filter(models.LogAuditoria.data_hora <= data_fim)
+        
     return query.order_by(models.LogAuditoria.data_hora.desc()).offset(skip).limit(limit).all() 

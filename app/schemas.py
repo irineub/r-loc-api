@@ -75,6 +75,8 @@ class ItemOrcamentoBase(BaseModel):
     quantidade: int = Field(..., gt=0)
     preco_unitario: float = Field(..., gt=0)
     dias: int = Field(..., gt=0)
+    data_inicio: Optional[datetime] = None
+    data_fim: Optional[datetime] = None
     tipo_cobranca: str = Field(default='diaria')
     subtotal: float = Field(..., gt=0)
 
@@ -129,6 +131,8 @@ class ItemLocacaoBase(BaseModel):
     quantidade_devolvida: int | None = None
     preco_unitario: float = Field(..., gt=0)
     dias: int = Field(..., gt=0)
+    data_inicio: Optional[datetime] = None
+    data_fim: Optional[datetime] = None
     subtotal: float = Field(..., gt=0)
 
 class ItemLocacaoCreate(ItemLocacaoBase):

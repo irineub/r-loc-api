@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 
 # URL da API (alterar para staging quando necessário)
-API_URL = "http://137.131.201.11/api/api"
+# API_URL = "http://137.131.201.11/api/api"
+API_URL = "http://localhost:8000"
 # API_URL = "https://srv938431.hstgr.cloud/api"
-# Dados realistas para geração
+# Dados realistas para gera
 CLIENTES_PF = [
     {"nome": "João Silva", "cpf": "123.456.789-00", "rg": "12.345.678-9", "email": "joao.silva@email.com", "telefone": "(92) 98765-4321"},
     {"nome": "Maria Santos", "cpf": "234.567.890-11", "rg": "23.456.789-0", "email": "maria.santos@email.com", "telefone": "(92) 97654-3210"},
@@ -178,11 +179,18 @@ def criar_orcamento(cliente_id: int, equipamentos_ids: List[int], funcionario_us
             subtotal = quantidade * preco_base * dias
             total += subtotal
             
+            # Vary item dates slightly from global dates (0-5 days delay start, same duration)
+            delay_days = random.randint(0, 5)
+            item_start = data_inicio + timedelta(days=delay_days)
+            item_end = item_start + timedelta(days=dias)
+            
             itens.append({
                 "equipamento_id": equip_id,
                 "quantidade": quantidade,
                 "preco_unitario": preco_base,
                 "dias": dias,
+                "data_inicio": item_start.isoformat(),
+                "data_fim": item_end.isoformat(),
                 "tipo_cobranca": random.choice(["diaria", "semanal", "quinzenal", "mensal"]),
                 "subtotal": subtotal,
             })
