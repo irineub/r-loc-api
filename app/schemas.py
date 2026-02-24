@@ -97,9 +97,11 @@ class OrcamentoBase(BaseModel):
     data_inicio: datetime
     data_fim: datetime
     desconto: float = Field(default=0.0, ge=0)
+    desconto_percentual: float = Field(default=0.0, ge=0, le=100)
     frete: float = Field(default=0.0, ge=0)
     total_final: float = Field(..., gt=0)
     observacoes: Optional[str] = None
+    funcionario_id: Optional[int] = None
 
 class OrcamentoCreate(OrcamentoBase):
     itens: List[ItemOrcamentoCreate]
@@ -108,17 +110,20 @@ class OrcamentoUpdate(BaseModel):
     data_inicio: Optional[datetime] = None
     data_fim: Optional[datetime] = None
     desconto: Optional[float] = Field(None, ge=0)
+    desconto_percentual: Optional[float] = Field(None, ge=0, le=100)
     frete: Optional[float] = Field(None, ge=0)
     total_final: Optional[float] = Field(None, gt=0)
     observacoes: Optional[str] = None
     itens: Optional[List[ItemOrcamentoCreate]] = None
     status: Optional[StatusOrcamento] = None
+    funcionario_id: Optional[int] = None
 
 class Orcamento(OrcamentoBase):
     id: int
     status: StatusOrcamento
     data_criacao: datetime
     cliente: Cliente
+    funcionario: Optional['Funcionario'] = None
     itens: List[ItemOrcamento]
 
     class Config:
@@ -155,6 +160,7 @@ class LocacaoBase(BaseModel):
     total_final: float = Field(..., gt=0)
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
+    funcionario_id: Optional[int] = None
 
 class LocacaoCreate(LocacaoBase):
     itens: List[ItemLocacaoCreate]
@@ -164,6 +170,7 @@ class LocacaoUpdate(BaseModel):
     data_devolucao: Optional[datetime] = None
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
+    funcionario_id: Optional[int] = None
 
 class Locacao(LocacaoBase):
     id: int
@@ -173,6 +180,7 @@ class Locacao(LocacaoBase):
     data_criacao: datetime
     orcamento: Orcamento
     cliente: Cliente
+    funcionario: Optional['Funcionario'] = None
     itens: List[ItemLocacao]
 
     class Config:

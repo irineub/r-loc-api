@@ -14,13 +14,15 @@ def create_orcamento(
     x_funcionario_username: Optional[str] = Header(None)
 ):
     """Create a new orcamento"""
-    db_orcamento = crud.create_orcamento(db=db, orcamento=orcamento)
-    
-    # Registrar log
+    # Buscar funcionário
     funcionario = None
     funcionario_username = x_funcionario_username or "rloc"
     if x_funcionario_username:
         funcionario = crud.get_funcionario_by_username(db, x_funcionario_username)
+        if funcionario:
+            orcamento.funcionario_id = funcionario.id
+
+    db_orcamento = crud.create_orcamento(db=db, orcamento=orcamento)
     
     # Buscar nome do cliente
     cliente = crud.get_cliente(db, orcamento.cliente_id)

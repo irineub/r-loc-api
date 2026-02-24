@@ -60,7 +60,18 @@ def create_equipamento(db: Session, equipamento: schemas.EquipamentoCreate):
 def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.EquipamentoUpdate):
     db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
     if db_equipamento:
-        for key, value in equipamento.dict(exclude_unset=True).items():
+        update_data = equipamento.dict(exclude_unset=True)
+        
+        if db_equipamento.estoque_alugado > 0:
+            allowed_fields = {'estoque'}
+            for key in update_data.keys():
+                if key not in allowed_fields and update_data[key] is not None and update_data[key] != getattr(db_equipamento, key):
+                    raise ValueError(f"Não é possível alterar o campo '{key}' pois o equipamento está em uso. Apenas a quantidade em estoque pode ser aumentada.")
+            
+            if 'estoque' in update_data and update_data['estoque'] is not None and update_data['estoque'] < db_equipamento.estoque:
+                raise ValueError("Não é possível reduzir a quantidade em estoque de um equipamento que está atualmente em uso. Só é permitido adicionar mais unidades.")
+                
+        for key, value in update_data.items():
             setattr(db_equipamento, key, value)
         db.commit()
         db.refresh(db_equipamento)
@@ -69,9 +80,16 @@ def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.Eq
 def delete_equipamento(db: Session, equipamento_id: int):
     db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
     if db_equipamento:
+        # Check if equipamento has associated items in locacoes or orcamentos
+        from app.models import ItemLocacao, ItemOrcamento
+        has_locacao = db.query(ItemLocacao).filter(ItemLocacao.equipamento_id == equipamento_id).first()
+        has_orcamento = db.query(ItemOrcamento).filter(ItemOrcamento.equipamento_id == equipamento_id).first()
+        if has_locacao or has_orcamento:
+            raise ValueError("Não é possível excluir este equipamento pois ele possui histórico de locações ou orçamentos vinculados.")
         db.delete(db_equipamento)
         db.commit()
     return db_equipamento
+
 
 def update_equipamento_stock(db: Session, equipamento_id: int, quantidade_alugada: int):
     db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
@@ -385,7 +403,7 @@ def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[
         joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
     ).offset(skip).limit(limit).all()
 
-def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entrega: Optional[str] = None):
+def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entrega: Optional[str] = None, funcionario_id: Optional[int] = None):
     # Buscar o orçamento
     orcamento = db.query(models.Orcamento).filter(models.Orcamento.id == orcamento_id).first()
     if not orcamento:
@@ -408,7 +426,8 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
         "total_final": orcamento.total_final,
         "status": "ativa",
         "endereco_entrega": endereco_entrega,
-        "data_criacao": get_current_time()
+        "data_criacao": get_current_time(),
+        "funcionario_id": funcionario_id
     }
     
     db_locacao = models.Locacao(**locacao_data)

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine
 from app.models import Base
-from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionarios, logs, upload, config, pdf
+from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionarios, logs, upload, config, pdf, relatorios
 
 # ... existing code ...
 
@@ -58,6 +58,7 @@ app.include_router(orcamentos.router, prefix="/orcamentos", tags=["Orçamentos"]
 app.include_router(locacoes.router, prefix="/locacoes", tags=["Locações"])
 app.include_router(funcionarios.router, prefix="/funcionarios", tags=["Funcionários"])
 app.include_router(logs.router, prefix="/logs", tags=["Logs"])
+app.include_router(relatorios.router, prefix="/relatorios", tags=["Relatórios"])
 app.include_router(upload.router, tags=["Upload"])
 app.include_router(config.router, tags=["Config"])
 app.include_router(pdf.router, prefix="/pdf", tags=["PDF"])

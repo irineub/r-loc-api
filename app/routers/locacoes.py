@@ -147,15 +147,21 @@ def create_locacao_from_orcamento(
     """Create a locacao from an approved orcamento"""
     try:
         endereco_entrega = request.endereco_entrega if request else None
-        db_locacao = crud.create_locacao_from_orcamento(db, orcamento_id=orcamento_id, endereco_entrega=endereco_entrega)
-        if db_locacao is None:
-            raise HTTPException(status_code=404, detail="Orçamento não encontrado ou não aprovado")
         
-        # Registrar log
+        # Obter funcionário
         funcionario = None
         funcionario_username = x_funcionario_username or "rloc"
         if x_funcionario_username:
             funcionario = crud.get_funcionario_by_username(db, x_funcionario_username)
+            
+        db_locacao = crud.create_locacao_from_orcamento(
+            db, 
+            orcamento_id=orcamento_id, 
+            endereco_entrega=endereco_entrega,
+            funcionario_id=funcionario.id if funcionario else None
+        )
+        if db_locacao is None:
+            raise HTTPException(status_code=404, detail="Orçamento não encontrado ou não aprovado")
         
         # Buscar nome do cliente
         cliente = crud.get_cliente(db, db_locacao.cliente_id)

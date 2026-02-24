@@ -13,10 +13,41 @@ def _replace_logo_paths(html: str) -> str:
     logo_path = os.path.join(assets_dir, "logo-r-loc.jpg")
 
     if os.path.exists(logo_path):
+        # On Windows, use forward slashes for file:// URIs
+        logo_uri = logo_path.replace("\\", "/")
+        if not logo_uri.startswith("/"):
+            logo_uri = "/" + logo_uri
         for ref in ["/logo-r-loc.jpg", "./assets/logo-r-loc.jpg"]:
-            html = html.replace(f'src="{ref}"', f'src="file://{logo_path}"')
-            html = html.replace(f"src='{ref}'", f"src='file://{logo_path}'")
+            html = html.replace(f'src="{ref}"', f'src="file://{logo_uri}"')
+            html = html.replace(f"src='{ref}'", f"src='file://{logo_uri}'")
     return html
+
+
+def _fix_images_for_xhtml2pdf(html: str) -> str:
+    """
+    xhtml2pdf não suporta CSS max-height em imagens — substitui por height fixo.
+    Remove max-height/max-width do style e garante height="80" como atributo.
+    """
+    import re
+
+    def fix_img(m: re.Match) -> str:
+        tag = m.group(0)
+        # Extrair max-height do style, se existir
+        mh = re.search(r'max-height\s*:\s*(\d+)px', tag)
+        height_val = int(mh.group(1)) if mh else 80
+
+        # Remover max-height e max-width do style inline
+        tag = re.sub(r'max-height\s*:\s*[^;\"\']+;?', '', tag)
+        tag = re.sub(r'max-width\s*:\s*[^;\"\']+;?', '', tag)
+
+        # Adicionar height + width=auto como atributos HTML (xhtml2pdf respeita isso)
+        if 'height=' not in tag:
+            tag = tag.replace('<img ', f'<img height="{height_val}" width="auto" ', 1)
+        elif 'width=' not in tag:
+            tag = tag.replace('<img ', '<img width="auto" ', 1)
+        return tag
+
+    return re.sub(r'<img\b[^>]*>', fix_img, html, flags=re.IGNORECASE)
 
 
 def _try_weasyprint(html: str) -> bytes:
@@ -49,8 +80,10 @@ def _generate_simple_pdf_from_html(html: str) -> bytes:
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.enums import TA_CENTER
 
-    # Remover tags HTML e manter texto limpo
-    text = re.sub(r'<br\s*/?>', '\n', html, flags=re.IGNORECASE)
+    # Remover blocos <style> e <script> ANTES de remover tags genéricas
+    text = re.sub(r'<style\b[^>]*>.*?</style>', '', html, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<script\b[^>]*>.*?</script>', '', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
     text = re.sub(r'<[^>]+>', ' ', text)
     text = re.sub(r'&amp;', '&', text)
     text = re.sub(r'&lt;', '<', text)
@@ -72,6 +105,7 @@ def _generate_simple_pdf_from_html(html: str) -> bytes:
         story.append(Spacer(1, 4))
     doc.build(story)
     return buf.getvalue()
+
 
 
 @router.post("/generate")
@@ -100,7 +134,8 @@ async def generate_pdf(
 
         # 2. xhtml2pdf
         try:
-            return Response(content=_try_xhtml2pdf(modified_html), media_type="application/pdf")
+            xhtml_html = _fix_images_for_xhtml2pdf(modified_html)
+            return Response(content=_try_xhtml2pdf(xhtml_html), media_type="application/pdf")
         except ImportError:
             errors.append("xhtml2pdf: não instalado")
         except Exception as e:

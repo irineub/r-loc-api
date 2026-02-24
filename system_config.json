@@ -1,0 +1,12 @@
+{
+  "uazapi": {
+    "url": "https://free.uazapi.com",
+    "token": "4932aad2-c8a3-426d-907e-5b0c23b16279"
+  },
+  "timezone": "America/Manaus",
+  "ngrok": {
+    "enabled": true,
+    "url": "https://jayde-gawkiest-horrifiedly.ngrok-free.dev",
+    "port": 8030
+  }
+}

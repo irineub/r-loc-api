@@ -4,11 +4,13 @@ import shutil
 import os
 import re
 import mimetypes
+import json
 
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+CONFIG_FILE = "system_config.json"
 
 # Ensure PDF mime type is registered
 mimetypes.add_type("application/pdf", ".pdf")
@@ -23,7 +25,24 @@ def _sanitize_filename(name: str) -> str:
 
 
 def _build_base_url(request: Request) -> str:
-    """Build the correct public base URL, respecting reverse-proxy headers."""
+    """Build the correct public base URL, respecting reverse-proxy headers and ngrok config."""
+    # Primeiro verifica se URL externa pública está configurada (Upload Config)
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                config = json.load(f)
+                upload_config = config.get("upload", {})
+                if upload_config.get("public_url"):
+                    return upload_config.get("public_url").rstrip('/')
+                
+                # Tratar retrocompatibilidade
+                ngrok_config = config.get("ngrok", {})
+                if ngrok_config.get("enabled") and ngrok_config.get("url"):
+                    return ngrok_config.get("url").rstrip('/')
+        except Exception as e:
+            print(f"Error reading config for public URL: {e}")
+
+    # Se não, continua com o comportamento padrão
     forwarded_host = request.headers.get('x-forwarded-host', '')
     forwarded_proto = request.headers.get('x-forwarded-proto', '')
     if forwarded_host:

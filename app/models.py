@@ -77,6 +77,7 @@ class Orcamento(Base):
     data_inicio = Column(DateTime, nullable=False)
     data_fim = Column(DateTime, nullable=False)
     desconto = Column(Float, default=0.0)
+    desconto_percentual = Column(Float, default=0.0)
     frete = Column(Float, default=0.0)
     total_final = Column(Float, nullable=False)
     status = Column(Enum(StatusOrcamento), default=StatusOrcamento.PENDENTE)
@@ -88,6 +89,8 @@ class Orcamento(Base):
     cliente = relationship("Cliente", back_populates="orcamentos")
     itens = relationship("ItemOrcamento", back_populates="orcamento")
     locacao = relationship("Locacao", back_populates="orcamento", uselist=False)
+    funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=True)
+    funcionario = relationship("Funcionario")
 
 class ItemOrcamento(Base):
     __tablename__ = "itens_orcamento"
@@ -126,6 +129,8 @@ class Locacao(Base):
     orcamento = relationship("Orcamento", back_populates="locacao")
     cliente = relationship("Cliente", back_populates="locacoes")
     itens = relationship("ItemLocacao", back_populates="locacao")
+    funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=True)
+    funcionario = relationship("Funcionario")
 
 class ItemLocacao(Base):
     __tablename__ = "itens_locacao"
