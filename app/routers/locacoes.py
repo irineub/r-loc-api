@@ -55,6 +55,19 @@ def update_locacao(locacao_id: int, locacao: schemas.LocacaoUpdate, db: Session 
         raise HTTPException(status_code=404, detail="Locação não encontrada")
     return db_locacao
 
+@router.patch("/{locacao_id}/assinatura", response_model=schemas.Locacao)
+def update_assinatura_locacao(locacao_id: int, assinatura_data: schemas.LocacaoUpdateAssinatura, db: Session = Depends(get_db)):
+    """Update the signature data of a locacao"""
+    # Reuse update_locacao logic
+    locacao_update = schemas.LocacaoUpdate(
+        assinatura_realizada=assinatura_data.assinatura_realizada,
+        assinatura_base64=assinatura_data.assinatura_base64
+    )
+    db_locacao = crud.update_locacao(db, locacao_id=locacao_id, locacao=locacao_update)
+    if db_locacao is None:
+        raise HTTPException(status_code=404, detail="Locação não encontrada")
+    return db_locacao
+
 @router.post("/{locacao_id}/finalizar", response_model=schemas.LocacaoResponse)
 def finalizar_locacao(
     locacao_id: int, 

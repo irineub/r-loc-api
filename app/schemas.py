@@ -161,6 +161,8 @@ class LocacaoBase(BaseModel):
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
     funcionario_id: Optional[int] = None
+    assinatura_realizada: bool = False
+    assinatura_base64: Optional[str] = None
 
 class LocacaoCreate(LocacaoBase):
     itens: List[ItemLocacaoCreate]
@@ -171,6 +173,12 @@ class LocacaoUpdate(BaseModel):
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
     funcionario_id: Optional[int] = None
+    assinatura_realizada: Optional[bool] = None
+    assinatura_base64: Optional[str] = None
+
+class LocacaoUpdateAssinatura(BaseModel):
+    assinatura_realizada: bool
+    assinatura_base64: Optional[str] = None
 
 class Locacao(LocacaoBase):
     id: int

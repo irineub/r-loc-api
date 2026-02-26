@@ -124,6 +124,8 @@ class Locacao(Base):
     data_devolucao = Column(DateTime)
     endereco_entrega = Column(Text)  # Endereço de entrega dos equipamentos
     data_criacao = Column(DateTime(timezone=True), server_default=func.now())
+    assinatura_realizada = Column(Boolean, default=False)
+    assinatura_base64 = Column(Text, nullable=True)
 
     # Relationships
     orcamento = relationship("Orcamento", back_populates="locacao")
