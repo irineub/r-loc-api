@@ -133,7 +133,7 @@ class Orcamento(OrcamentoBase):
 class ItemLocacaoBase(BaseModel):
     equipamento_id: int
     quantidade: int = Field(..., gt=0)
-    quantidade_devolvida: int | None = None
+    quantidade_devolvida: Optional[int] = None
     preco_unitario: float = Field(..., gt=0)
     dias: int = Field(..., gt=0)
     data_inicio: Optional[datetime] = None
