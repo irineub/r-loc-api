@@ -30,7 +30,8 @@ def _to_local_naive(dt, timezone_str: str):
     except Exception:
         return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
-@router.get("/", response_model=List[schemas.LogAuditoria])
+@router.get("", response_model=List[schemas.LogAuditoria])
+@router.get("/", response_model=List[schemas.LogAuditoria], include_in_schema=False)
 def read_logs(
     skip: int = 0,
     limit: int = 100,
