@@ -24,9 +24,9 @@ def create_equipamento(equipamento: schemas.EquipamentoCreate, db: Session = Dep
 @router.put("/{equipamento_id}", response_model=schemas.Equipamento)
 @router.patch("/{equipamento_id}", response_model=schemas.Equipamento)
 @router.post("/{equipamento_id}/update", response_model=schemas.Equipamento)
-def update_equipamento(equipamento_id: int, equipamento: schemas.EquipamentoUpdate, db: Session = Depends(get_db)):
+def update_equipamento(equipamento_id: int, equipamento: schemas.EquipamentoUpdate, is_master: bool = False, db: Session = Depends(get_db)):
     try:
-        db_equipamento = crud.update_equipamento(db, equipamento_id=equipamento_id, equipamento=equipamento)
+        db_equipamento = crud.update_equipamento(db, equipamento_id=equipamento_id, equipamento=equipamento, is_master=is_master)
         if db_equipamento is None:
             raise HTTPException(status_code=404, detail="Equipamento não encontrado")
         return db_equipamento

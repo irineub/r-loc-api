@@ -52,17 +52,17 @@ async def generic_exception_handler(request: Request, exc: Exception):
     )
 
 # Include routers
-app.include_router(clientes.router, prefix="/clientes", tags=["Clientes"])
-app.include_router(equipamentos.router, prefix="/equipamentos", tags=["Equipamentos"])
-app.include_router(orcamentos.router, prefix="/orcamentos", tags=["Orçamentos"])
-app.include_router(locacoes.router, prefix="/locacoes", tags=["Locações"])
-app.include_router(funcionarios.router, prefix="/funcionarios", tags=["Funcionários"])
-app.include_router(logs.router, prefix="/logs", tags=["Logs"])
-app.include_router(relatorios.router, prefix="/relatorios", tags=["Relatórios"])
-app.include_router(upload.router, tags=["Upload"])
-app.include_router(config.router, tags=["Config"])
-app.include_router(pdf.router, prefix="/pdf", tags=["PDF"])
+app.include_router(clientes.router, prefix="/api/clientes", tags=["Clientes"])
+app.include_router(equipamentos.router, prefix="/api/equipamentos", tags=["Equipamentos"])
+app.include_router(orcamentos.router, prefix="/api/orcamentos", tags=["Orçamentos"])
+app.include_router(locacoes.router, prefix="/api/locacoes", tags=["Locações"])
+app.include_router(funcionarios.router, prefix="/api/funcionarios", tags=["Funcionários"])
+app.include_router(logs.router, prefix="/api/logs", tags=["Logs"])
+app.include_router(relatorios.router, prefix="/api/relatorios", tags=["Relatórios"])
+app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
+app.include_router(config.router, prefix="/api/config", tags=["Config"])
+app.include_router(pdf.router, prefix="/api/pdf", tags=["PDF"])
 
-@app.get("/")
+@app.get("/api")
 async def root():
     return {"message": "R-Loc API - Sistema de Locação de Equipamentos"} 

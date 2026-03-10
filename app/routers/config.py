@@ -124,3 +124,38 @@ async def update_upload_config(config: UploadConfig):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao salvar configuração: {str(e)}")
 
+
+class AssinaturaConfig(BaseModel):
+    assinatura_base64: str
+
+@router.get("/config/assinatura")
+async def get_assinatura_config():
+    default = {"assinatura_base64": ""}
+    if not os.path.exists(CONFIG_FILE):
+        return default
+    try:
+        with open(CONFIG_FILE, "r") as f:
+            config = json.load(f)
+            return config.get("assinatura_locadora", default)
+    except Exception as e:
+        print(f"Error reading assinatura config: {e}")
+        return default
+
+@router.post("/config/assinatura")
+async def update_assinatura_config(config: AssinaturaConfig):
+    current_config = {}
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, "r") as f:
+                current_config = json.load(f)
+        except:
+            pass
+
+    current_config["assinatura_locadora"] = config.dict()
+
+    try:
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(current_config, f, indent=2)
+        return {"message": "Assinatura da locadora atualizada com sucesso"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar assinatura: {str(e)}")

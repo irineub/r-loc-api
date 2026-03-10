@@ -57,16 +57,18 @@ def create_equipamento(db: Session, equipamento: schemas.EquipamentoCreate):
     db.refresh(db_equipamento)
     return db_equipamento
 
-def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.EquipamentoUpdate):
+def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.EquipamentoUpdate, is_master: bool = False):
     db_equipamento = db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
     if db_equipamento:
         update_data = equipamento.dict(exclude_unset=True)
         
         if db_equipamento.estoque_alugado > 0:
-            allowed_fields = {'estoque'}
+            # Se for master, permite editar estoque E também preços
+            allowed_fields = {'estoque', 'preco_diaria', 'preco_semanal', 'preco_quinzenal', 'preco_mensal'} if is_master else {'estoque'}
+            
             for key in update_data.keys():
                 if key not in allowed_fields and update_data[key] is not None and update_data[key] != getattr(db_equipamento, key):
-                    raise ValueError(f"Não é possível alterar o campo '{key}' pois o equipamento está em uso. Apenas a quantidade em estoque pode ser aumentada.")
+                    raise ValueError(f"Não é possível alterar o campo '{key}' pois o equipamento está em uso.")
             
             if 'estoque' in update_data and update_data['estoque'] is not None and update_data['estoque'] < db_equipamento.estoque:
                 raise ValueError("Não é possível reduzir a quantidade em estoque de um equipamento que está atualmente em uso. Só é permitido adicionar mais unidades.")
