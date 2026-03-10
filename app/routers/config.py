@@ -11,7 +11,7 @@ class UazapiConfig(BaseModel):
     url: str
     token: str
 
-@router.get("/config/uazapi")
+@router.get("/uazapi")
 async def get_uazapi_config():
     if not os.path.exists(CONFIG_FILE):
         return {"url": "", "token": ""}
@@ -24,7 +24,7 @@ async def get_uazapi_config():
         print(f"Error reading config: {e}")
         return {"url": "", "token": ""}
 
-@router.post("/config/uazapi")
+@router.post("/uazapi")
 async def update_uazapi_config(config: UazapiConfig):
     current_config = {}
     if os.path.exists(CONFIG_FILE):
@@ -46,7 +46,7 @@ async def update_uazapi_config(config: UazapiConfig):
 class TimezoneConfig(BaseModel):
     timezone: str
 
-@router.get("/config/timezone")
+@router.get("/timezone")
 async def get_timezone_config():
     default_tz = "America/Manaus"
     if not os.path.exists(CONFIG_FILE):
@@ -60,7 +60,7 @@ async def get_timezone_config():
         print(f"Error reading config: {e}")
         return {"timezone": default_tz}
 
-@router.post("/config/timezone")
+@router.post("/timezone")
 async def update_timezone_config(config: TimezoneConfig):
     current_config = {}
     if os.path.exists(CONFIG_FILE):
@@ -83,7 +83,7 @@ class UploadConfig(BaseModel):
     use_base64: bool
     public_url: str
 
-@router.get("/config/upload")
+@router.get("/upload")
 async def get_upload_config():
     default_config = {"use_base64": True, "public_url": ""}
     if not os.path.exists(CONFIG_FILE):
@@ -105,7 +105,7 @@ async def get_upload_config():
         print(f"Error reading upload config: {e}")
         return default_config
 
-@router.post("/config/upload")
+@router.post("/upload")
 async def update_upload_config(config: UploadConfig):
     current_config = {}
     if os.path.exists(CONFIG_FILE):
@@ -128,7 +128,7 @@ async def update_upload_config(config: UploadConfig):
 class AssinaturaConfig(BaseModel):
     assinatura_base64: str
 
-@router.get("/config/assinatura")
+@router.get("/assinatura")
 async def get_assinatura_config():
     default = {"assinatura_base64": ""}
     if not os.path.exists(CONFIG_FILE):
@@ -141,7 +141,7 @@ async def get_assinatura_config():
         print(f"Error reading assinatura config: {e}")
         return default
 
-@router.post("/config/assinatura")
+@router.post("/assinatura")
 async def update_assinatura_config(config: AssinaturaConfig):
     current_config = {}
     if os.path.exists(CONFIG_FILE):
