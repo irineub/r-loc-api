@@ -1,8 +1,11 @@
 import sqlite3
 
+import os
+
 def migrate():
     try:
-        conn = sqlite3.connect('/home/irineu/rloc/r-loc-api/r-loc.db')
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "r-loc.db")
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
         # Add desconto

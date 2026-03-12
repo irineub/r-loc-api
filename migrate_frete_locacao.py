@@ -19,13 +19,21 @@ def migrate():
             
             # Now update the frete of all existing locacoes to match to their orcamento frete
             print("Copying historical frete from orcamentos to locacoes...")
-            cursor.execute("""
-                UPDATE locacoes
-                SET frete = (
-                    SELECT frete FROM orcamentos WHERE orcamentos.id = locacoes.orcamento_id
-                )
-                WHERE locacao_original_id IS NULL
-            """)
+            if 'locacao_original_id' in columns:
+                cursor.execute("""
+                    UPDATE locacoes
+                    SET frete = (
+                        SELECT frete FROM orcamentos WHERE orcamentos.id = locacoes.orcamento_id
+                    )
+                    WHERE locacao_original_id IS NULL
+                """)
+            else:
+                cursor.execute("""
+                    UPDATE locacoes
+                    SET frete = (
+                        SELECT frete FROM orcamentos WHERE orcamentos.id = locacoes.orcamento_id
+                    )
+                """)
             conn.commit()
             print("Column 'frete' added and populated successfully.")
         else:
