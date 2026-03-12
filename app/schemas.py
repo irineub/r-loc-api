@@ -157,12 +157,14 @@ class LocacaoBase(BaseModel):
     cliente_id: int
     data_inicio: datetime
     data_fim: datetime
+    frete: Optional[float] = 0.0
     total_final: float = Field(..., gt=0)
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
     funcionario_id: Optional[int] = None
     assinatura_realizada: bool = False
     assinatura_base64: Optional[str] = None
+    locacao_original_id: Optional[int] = None
 
 class LocacaoCreate(LocacaoBase):
     itens: List[ItemLocacaoCreate]
@@ -179,6 +181,22 @@ class LocacaoUpdate(BaseModel):
 class LocacaoUpdateAssinatura(BaseModel):
     assinatura_realizada: bool
     assinatura_base64: Optional[str] = None
+
+class RenovarLocacaoItem(BaseModel):
+    equipamento_id: int
+    data_fim: datetime
+    tipo_cobranca: Optional[str] = None
+    preco_unitario: Optional[float] = None
+    subtotal: Optional[float] = None
+
+class RenovarLocacaoRequest(BaseModel):
+    data_inicio: datetime
+    data_fim: datetime
+    desconto: Optional[float] = 0.0
+    desconto_percentual: Optional[float] = 0.0
+    frete: Optional[float] = 0.0
+    total_final: Optional[float] = 0.0
+    itens: List[RenovarLocacaoItem]
 
 class Locacao(LocacaoBase):
     id: int

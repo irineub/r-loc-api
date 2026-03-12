@@ -118,6 +118,9 @@ class Locacao(Base):
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False)
     data_inicio = Column(DateTime, nullable=False)
     data_fim = Column(DateTime, nullable=False)
+    desconto = Column(Float, nullable=True, default=0.0)
+    desconto_percentual = Column(Float, nullable=True, default=0.0)
+    frete = Column(Float, nullable=True, default=0.0)
     status = Column(Enum(StatusLocacao), default=StatusLocacao.ATIVA)
     total_final = Column(Float, nullable=False)
     observacoes = Column(Text)
@@ -126,6 +129,7 @@ class Locacao(Base):
     data_criacao = Column(DateTime(timezone=True), server_default=func.now())
     assinatura_realizada = Column(Boolean, default=False)
     assinatura_base64 = Column(Text, nullable=True)
+    locacao_original_id = Column(Integer, ForeignKey("locacoes.id"), nullable=True)
 
     # Relationships
     orcamento = relationship("Orcamento", back_populates="locacao")
@@ -133,6 +137,7 @@ class Locacao(Base):
     itens = relationship("ItemLocacao", back_populates="locacao")
     funcionario_id = Column(Integer, ForeignKey("funcionarios.id"), nullable=True)
     funcionario = relationship("Funcionario")
+    locacao_original = relationship("Locacao", remote_side=[id], backref="renovacoes")
 
 class ItemLocacao(Base):
     __tablename__ = "itens_locacao"

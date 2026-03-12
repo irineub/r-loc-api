@@ -203,3 +203,51 @@ def receber_parcial(locacao_id: int, payload: RecebimentoParcial, db: Session = 
         return locacao
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{locacao_id}/renovar", response_model=schemas.LocacaoResponse)
+def renovar_locacao(
+    locacao_id: int,
+    request: schemas.RenovarLocacaoRequest,
+    db: Session = Depends(get_db),
+    x_funcionario_username: Optional[str] = Header(None)
+):
+    """Renew an existing locacao, creating a new one"""
+    try:
+        funcionario = None
+        funcionario_username = x_funcionario_username or "rloc"
+        if x_funcionario_username:
+            funcionario = crud.get_funcionario_by_username(db, x_funcionario_username)
+            
+        db_nova_locacao = crud.renovar_locacao(
+            db, 
+            locacao_id=locacao_id, 
+            request=request, 
+            funcionario_id=funcionario.id if funcionario else None
+        )
+        
+        # Buscar nome do cliente
+        cliente = crud.get_cliente(db, db_nova_locacao.cliente_id)
+        nome_cliente = cliente.nome_razao_social if cliente else f"ID {db_nova_locacao.cliente_id}"
+        
+        crud.create_log(
+            db=db,
+            funcionario_id=funcionario.id if funcionario else None,
+            funcionario_username=funcionario_username,
+            acao="renovar_locacao",
+            entidade="locacao",
+            entidade_id=db_nova_locacao.id,
+            detalhes=f"Locação renovada a partir da locação ID {locacao_id} para cliente {nome_cliente}"
+        )
+        
+        return {"locacao": db_nova_locacao, "message": "Locação renovada com sucesso"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{locacao_id}/renovacoes", response_model=List[schemas.Locacao])
+def get_renovacoes(locacao_id: int, db: Session = Depends(get_db)):
+    """Get all renovations linked to a specific original locacao"""
+    # This fetches locações that point to locacao_id
+    # To be perfectly recursive, we can just find any locacao where locacao_original_id == locacao_id
+    # Or navigate backwards. For the modal, usually we just need immediate children.
+    renovacoes = db.query(crud.models.Locacao).filter(crud.models.Locacao.locacao_original_id == locacao_id).all()
+    return renovacoes

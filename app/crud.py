@@ -425,6 +425,9 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
         "cliente_id": orcamento.cliente_id,
         "data_inicio": orcamento.data_inicio,
         "data_fim": orcamento.data_fim,
+        "desconto": orcamento.desconto,
+        "desconto_percentual": orcamento.desconto_percentual,
+        "frete": orcamento.frete,
         "total_final": orcamento.total_final,
         "status": "ativa",
         "endereco_entrega": endereco_entrega,
@@ -543,6 +546,111 @@ def cancelar_locacao(db: Session, locacao_id: int):
     
     db.commit()
     return locacao
+
+def renovar_locacao(db: Session, locacao_id: int, request: schemas.RenovarLocacaoRequest, funcionario_id: Optional[int] = None):
+    # 1. Obter locação antiga
+    old_locacao = get_locacao(db, locacao_id)
+    if not old_locacao:
+        raise ValueError("Locação não encontrada")
+    
+    if old_locacao.status == StatusLocacao.CANCELADA:
+        raise ValueError("Não é possível renovar uma locação cancelada")
+        
+    # 2. Finalizar locação antiga se ainda estiver ativa ou atrasada.
+    if old_locacao.status in [StatusLocacao.ATIVA, StatusLocacao.ATRASADA]:
+        old_locacao = finalizar_locacao(db, locacao_id)
+        
+    # 3. Mapear as novas datas e preços por equipamento do request
+    item_requests = {item.equipamento_id: item for item in request.itens}
+    
+    # Mantém o histórico da cadeia de renovações usando a locação original (sempre aponta para a "raiz" ou para a imediatamente anterior)
+    # Vamos apontar para a locação imediatamente anterior
+    original_id_to_link = locacao_id
+    
+    # 4. Construir nova locação
+    locacao_data = {
+        "orcamento_id": old_locacao.orcamento_id,
+        "cliente_id": old_locacao.cliente_id,
+        "data_inicio": request.data_inicio,
+        "data_fim": request.data_fim,
+        "desconto": request.desconto,
+        "desconto_percentual": request.desconto_percentual,
+        "frete": request.frete,
+        "total_final": 0.0,
+        "status": StatusLocacao.ATIVA,
+        "endereco_entrega": old_locacao.endereco_entrega,
+        "data_criacao": get_current_time(),
+        "funcionario_id": funcionario_id,
+        "locacao_original_id": original_id_to_link
+    }
+    
+    db_nova_locacao = models.Locacao(**locacao_data)
+    db.add(db_nova_locacao)
+    db.flush()
+    db.refresh(db_nova_locacao)
+    
+    total_final = 0.0
+    
+    # 5. Criar novos itens
+    for old_item in old_locacao.itens:
+        equipamento = get_equipamento(db, old_item.equipamento_id)
+        if not equipamento:
+            continue
+            
+        req_item = item_requests.get(equipamento.id)
+        
+        data_fim_item = req_item.data_fim if req_item else request.data_fim
+        preco_unit = req_item.preco_unitario if req_item and req_item.preco_unitario else old_item.preco_unitario
+        
+        dias = max(1, calcular_dias(request.data_inicio, data_fim_item))
+        
+        # O backend recalcula o subtotal para fins de segurança, caso a cobranca não seja diária
+        # Tentamos extrair o fator caso o preço unit seja estritamente igual a tabela mensal, quinzenal ou semanal
+        base_periodo = 30
+        if preco_unit == equipamento.preco_diaria:
+             base_periodo = 1
+        elif preco_unit == equipamento.preco_semanal:
+             base_periodo = 7
+        elif preco_unit == equipamento.preco_quinzenal:
+             base_periodo = 15
+             
+        import math
+        fator = math.ceil(dias / base_periodo)
+        
+        subtotal = round(preco_unit * fator * old_item.quantidade, 2)
+        
+        # Verificar disponibilidade
+        estoque_disponivel = equipamento.estoque - equipamento.estoque_alugado
+        if estoque_disponivel < old_item.quantidade:
+             db.rollback()
+             raise ValueError(f"Estoque insuficiente para {equipamento.descricao} durante renovação.")
+             
+        item_locacao_data = {
+            "locacao_id": db_nova_locacao.id,
+            "equipamento_id": old_item.equipamento_id,
+            "quantidade": old_item.quantidade,
+            "quantidade_devolvida": 0,
+            "preco_unitario": preco_unit,
+            "dias": dias,
+            "subtotal": subtotal,
+            "data_inicio": request.data_inicio,
+            "data_fim": data_fim_item
+        }
+        
+        db_item_locacao = models.ItemLocacao(**item_locacao_data)
+        db.add(db_item_locacao)
+        
+        # Reservar estoque
+        equipamento.estoque_alugado += old_item.quantidade
+        
+        total_final += subtotal
+        
+    total_frete = request.frete or 0.0
+    db_nova_locacao.total_final = total_final - (request.desconto or 0.0) + total_frete
+    db.commit()
+    db.refresh(db_nova_locacao)
+    
+    return db_nova_locacao
 
 def receber_locacao_parcial(db: Session, locacao_id: int, itens: list[Dict[str, int]]):
     locacao = get_locacao(db, locacao_id=locacao_id)

@@ -11,6 +11,13 @@ from app.routers import clientes, equipamentos, orcamentos, locacoes, funcionari
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Run migrations automatically
+try:
+    import migration_runner
+    migration_runner.run_migrations()
+except Exception as e:
+    print(f"Erro ao executar migrações na inicialização: {e}")
+
 app = FastAPI(
     title="R-Loc API",
     description="Sistema de Locação de Equipamentos de Construção",
