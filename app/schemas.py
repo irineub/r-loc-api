@@ -158,6 +158,8 @@ class LocacaoBase(BaseModel):
     data_inicio: datetime
     data_fim: datetime
     frete: Optional[float] = 0.0
+    desconto: Optional[float] = 0.0
+    desconto_percentual: Optional[float] = 0.0
     total_final: float = Field(..., gt=0)
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
@@ -184,6 +186,7 @@ class LocacaoUpdateAssinatura(BaseModel):
 
 class RenovarLocacaoItem(BaseModel):
     equipamento_id: int
+    quantidade: int = Field(..., gt=0)
     data_fim: datetime
     tipo_cobranca: Optional[str] = None
     preco_unitario: Optional[float] = None

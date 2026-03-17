@@ -1,1 +1,7 @@
-[]
+[
+    "migrate_frete_locacao.py",
+    "migrate_locacoes.py",
+    "migrate_locacoes_desconto.py",
+    "migrate_renovacoes.py",
+    "migrate_tipo_cobranca_item_locacao.py"
+]

@@ -592,15 +592,13 @@ def renovar_locacao(db: Session, locacao_id: int, request: schemas.RenovarLocaca
     total_final = 0.0
     
     # 5. Criar novos itens
-    for old_item in old_locacao.itens:
-        equipamento = get_equipamento(db, old_item.equipamento_id)
+    for req_item in request.itens:
+        equipamento = get_equipamento(db, req_item.equipamento_id)
         if not equipamento:
             continue
             
-        req_item = item_requests.get(equipamento.id)
-        
-        data_fim_item = req_item.data_fim if req_item else request.data_fim
-        preco_unit = req_item.preco_unitario if req_item and req_item.preco_unitario else old_item.preco_unitario
+        data_fim_item = req_item.data_fim or request.data_fim
+        preco_unit = req_item.preco_unitario or equipamento.preco_diaria
         
         dias = max(1, calcular_dias(request.data_inicio, data_fim_item))
         
@@ -617,18 +615,18 @@ def renovar_locacao(db: Session, locacao_id: int, request: schemas.RenovarLocaca
         import math
         fator = math.ceil(dias / base_periodo)
         
-        subtotal = round(preco_unit * fator * old_item.quantidade, 2)
+        subtotal = round(preco_unit * fator * req_item.quantidade, 2)
         
         # Verificar disponibilidade
         estoque_disponivel = equipamento.estoque - equipamento.estoque_alugado
-        if estoque_disponivel < old_item.quantidade:
+        if estoque_disponivel < req_item.quantidade:
              db.rollback()
              raise ValueError(f"Estoque insuficiente para {equipamento.descricao} durante renovação.")
              
         item_locacao_data = {
             "locacao_id": db_nova_locacao.id,
-            "equipamento_id": old_item.equipamento_id,
-            "quantidade": old_item.quantidade,
+            "equipamento_id": req_item.equipamento_id,
+            "quantidade": req_item.quantidade,
             "quantidade_devolvida": 0,
             "preco_unitario": preco_unit,
             "dias": dias,
@@ -641,7 +639,7 @@ def renovar_locacao(db: Session, locacao_id: int, request: schemas.RenovarLocaca
         db.add(db_item_locacao)
         
         # Reservar estoque
-        equipamento.estoque_alugado += old_item.quantidade
+        equipamento.estoque_alugado += req_item.quantidade
         
         total_final += subtotal
         
