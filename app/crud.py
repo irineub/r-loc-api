@@ -133,7 +133,7 @@ def get_orcamento(db: Session, orcamento_id: int):
     return db.query(models.Orcamento).options(joinedload(models.Orcamento.locacao)).filter(models.Orcamento.id == orcamento_id).first()
 
 def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Optional[int] = None):
-    query = db.query(models.Orcamento)
+    query = db.query(models.Orcamento).order_by(models.Orcamento.id.desc())
     if cliente_id:
         query = query.filter(models.Orcamento.cliente_id == cliente_id)
     return query.offset(skip).limit(limit).all()
@@ -142,7 +142,7 @@ def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
     """Get only approved orcamentos from database"""
     return db.query(models.Orcamento).filter(
         models.Orcamento.status == "aprovado"
-    ).offset(skip).limit(limit).all()
+    ).order_by(models.Orcamento.id.desc()).offset(skip).limit(limit).all()
 
 def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
     # Agrupar quantidades por equipamento
@@ -396,7 +396,7 @@ def get_locacao(db: Session, locacao_id: int):
     ).filter(models.Locacao.id == locacao_id).first()
 
 def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[StatusLocacao] = None):
-    query = db.query(models.Locacao)
+    query = db.query(models.Locacao).order_by(models.Locacao.id.desc())
     if status:
         query = query.filter(models.Locacao.status == status)
     return query.options(
