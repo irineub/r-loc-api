@@ -30,8 +30,8 @@ def _to_local_naive(dt, timezone_str: str):
     except Exception:
         return dt.replace(tzinfo=None) if dt.tzinfo else dt
 
-@router.get("", response_model=List[schemas.LogAuditoria])
-@router.get("/", response_model=List[schemas.LogAuditoria], include_in_schema=False)
+@router.get("", response_model=schemas.PaginatedResponse[schemas.LogAuditoria])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.LogAuditoria], include_in_schema=False)
 def read_logs(
     skip: int = 0,
     limit: int = 100,
@@ -65,7 +65,7 @@ def read_logs(
         except ValueError:
             pass
 
-    logs = crud.get_logs(
+    items, total = crud.get_logs(
         db,
         skip=skip,
         limit=limit,
@@ -74,7 +74,7 @@ def read_logs(
         data_inicio=data_inicio,
         data_fim=data_fim
     )
-    return logs
+    return {"items": items, "total": total}
 
 @router.get("/{log_id}", response_model=schemas.LogAuditoria)
 def read_log(

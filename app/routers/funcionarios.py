@@ -19,7 +19,7 @@ def create_funcionario(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[schemas.Funcionario])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Funcionario])
 def read_funcionarios(
     skip: int = 0, 
     limit: int = 100,
@@ -28,8 +28,8 @@ def read_funcionarios(
     _: str = Depends(require_master)
 ):
     """Get all funcionarios - Apenas usuários master"""
-    funcionarios = crud.get_funcionarios(db, skip=skip, limit=limit, ativo=ativo)
-    return funcionarios
+    items, total = crud.get_funcionarios(db, skip=skip, limit=limit, ativo=ativo)
+    return {"items": items, "total": total}
 
 @router.get("/{funcionario_id}", response_model=schemas.Funcionario)
 def read_funcionario(

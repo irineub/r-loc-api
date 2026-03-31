@@ -14,7 +14,10 @@ def get_cliente(db: Session, cliente_id: int):
     return db.query(models.Cliente).filter(models.Cliente.id == cliente_id).first()
 
 def get_clientes(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Cliente).offset(skip).limit(limit).all()
+    query = db.query(models.Cliente).order_by(models.Cliente.id.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 def create_cliente(db: Session, cliente: schemas.ClienteCreate):
     cliente_data = cliente.dict()
@@ -47,8 +50,10 @@ def get_equipamento(db: Session, equipamento_id: int):
     return db.query(models.Equipamento).filter(models.Equipamento.id == equipamento_id).first()
 
 def get_equipamentos(db: Session, skip: int = 0, limit: int = 100):
-    equipamentos = db.query(models.Equipamento).offset(skip).limit(limit).all()
-    return equipamentos
+    query = db.query(models.Equipamento).order_by(models.Equipamento.id.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 def create_equipamento(db: Session, equipamento: schemas.EquipamentoCreate):
     db_equipamento = models.Equipamento(**equipamento.dict())
@@ -136,13 +141,16 @@ def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Opt
     query = db.query(models.Orcamento).order_by(models.Orcamento.id.desc())
     if cliente_id:
         query = query.filter(models.Orcamento.cliente_id == cliente_id)
-    return query.offset(skip).limit(limit).all()
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
     """Get only approved orcamentos from database"""
-    return db.query(models.Orcamento).filter(
-        models.Orcamento.status == "aprovado"
-    ).order_by(models.Orcamento.id.desc()).offset(skip).limit(limit).all()
+    query = db.query(models.Orcamento).filter(models.Orcamento.status == "aprovado").order_by(models.Orcamento.id.desc())
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
     # Agrupar quantidades por equipamento
@@ -399,11 +407,13 @@ def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[
     query = db.query(models.Locacao).order_by(models.Locacao.id.desc())
     if status:
         query = query.filter(models.Locacao.status == status)
-    return query.options(
+    total = query.count()
+    items = query.options(
         joinedload(models.Locacao.cliente),
         joinedload(models.Locacao.orcamento),
         joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
     ).offset(skip).limit(limit).all()
+    return items, total
 
 def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entrega: Optional[str] = None, funcionario_id: Optional[int] = None):
     # Buscar o orçamento
@@ -703,10 +713,12 @@ def get_funcionario_by_username(db: Session, username: str):
     return db.query(models.Funcionario).filter(models.Funcionario.username == username).first()
 
 def get_funcionarios(db: Session, skip: int = 0, limit: int = 100, ativo: Optional[bool] = None):
-    query = db.query(models.Funcionario)
+    query = db.query(models.Funcionario).order_by(models.Funcionario.id.desc())
     if ativo is not None:
         query = query.filter(models.Funcionario.ativo == ativo)
-    return query.offset(skip).limit(limit).all()
+    total = query.count()
+    items = query.offset(skip).limit(limit).all()
+    return items, total
 
 def create_funcionario(db: Session, funcionario: schemas.FuncionarioCreate):
     # Verificar se username já existe
@@ -789,4 +801,6 @@ def get_logs(db: Session, skip: int = 0, limit: int = 100,
     if data_fim:
         query = query.filter(models.LogAuditoria.data_hora <= data_fim)
         
-    return query.order_by(models.LogAuditoria.data_hora.desc()).offset(skip).limit(limit).all() 
+    total = query.count()
+    items = query.order_by(models.LogAuditoria.data_hora.desc()).offset(skip).limit(limit).all() 
+    return items, total

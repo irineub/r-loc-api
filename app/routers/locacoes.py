@@ -26,7 +26,7 @@ def create_locacao(locacao: schemas.LocacaoCreate, db: Session = Depends(get_db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=List[schemas.Locacao])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Locacao])
 def read_locacoes(
     skip: int = 0, 
     limit: int = 100, 
@@ -34,8 +34,8 @@ def read_locacoes(
     db: Session = Depends(get_db)
 ):
     """Get all locacoes with optional status filter"""
-    locacoes = crud.get_locacoes(db, skip=skip, limit=limit, status=status)
-    return locacoes
+    items, total = crud.get_locacoes(db, skip=skip, limit=limit, status=status)
+    return {"items": items, "total": total}
 
 @router.get("/{locacao_id}", response_model=schemas.Locacao)
 def read_locacao(locacao_id: int, db: Session = Depends(get_db)):
@@ -140,10 +140,11 @@ def cancelar_locacao(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/ativas/", response_model=List[schemas.Locacao])
+@router.get("/ativas/", response_model=schemas.PaginatedResponse[schemas.Locacao])
 def read_locacoes_ativas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all active locacoes"""
-    return crud.get_locacoes(db, skip=skip, limit=limit, status=StatusLocacao.ATIVA)
+    items, total = crud.get_locacoes(db, skip=skip, limit=limit, status=StatusLocacao.ATIVA)
+    return {"items": items, "total": total}
 
 @router.get("/atrasadas/", response_model=List[schemas.Locacao])
 def read_locacoes_atrasadas(db: Session = Depends(get_db)):

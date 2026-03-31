@@ -40,7 +40,7 @@ def create_orcamento(
     
     return db_orcamento
 
-@router.get("/", response_model=List[schemas.Orcamento])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Orcamento])
 def read_orcamentos(
     skip: int = 0, 
     limit: int = 100, 
@@ -48,8 +48,8 @@ def read_orcamentos(
     db: Session = Depends(get_db)
 ):
     """Get all orcamentos with optional cliente filter"""
-    orcamentos = crud.get_orcamentos(db, skip=skip, limit=limit, cliente_id=cliente_id)
-    return orcamentos
+    items, total = crud.get_orcamentos(db, skip=skip, limit=limit, cliente_id=cliente_id)
+    return {"items": items, "total": total}
 
 @router.get("/{orcamento_id}", response_model=schemas.Orcamento)
 def read_orcamento(orcamento_id: int, db: Session = Depends(get_db)):
@@ -135,16 +135,18 @@ def rejeitar_orcamento(
     
     return {"orcamento": db_orcamento, "message": "Orçamento rejeitado"}
 
-@router.get("/pendentes/", response_model=List[schemas.Orcamento])
+@router.get("/pendentes/", response_model=schemas.PaginatedResponse[schemas.Orcamento])
 def read_orcamentos_pendentes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all pending orcamentos"""
-    orcamentos = crud.get_orcamentos(db, skip=skip, limit=limit)
-    return [orc for orc in orcamentos if orc.status == StatusOrcamento.PENDENTE]
+    items, _ = crud.get_orcamentos(db, skip=0, limit=10000)
+    pendentes = [orc for orc in items if orc.status == StatusOrcamento.PENDENTE]
+    return {"items": pendentes[skip:skip+limit], "total": len(pendentes)}
 
-@router.get("/aprovados/", response_model=List[schemas.Orcamento])
+@router.get("/aprovados/", response_model=schemas.PaginatedResponse[schemas.Orcamento])
 def read_orcamentos_aprovados(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all approved orcamentos"""
-    return crud.get_orcamentos_aprovados(db, skip=skip, limit=limit)
+    items, total = crud.get_orcamentos_aprovados(db, skip=skip, limit=limit)
+    return {"items": items, "total": total}
 
 @router.post("/limpar-rejeitados/")
 def limpar_orcamentos_rejeitados_endpoint(dias: int = 30, db: Session = Depends(get_db)):

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, TypeVar, Generic
 from datetime import datetime
 from app.models import TipoPessoa, TipoCobranca, StatusOrcamento, StatusLocacao
 
@@ -266,4 +266,10 @@ class LogAuditoria(LogAuditoriaBase):
     data_hora: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+T = TypeVar('T')
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    items: List[T]
+    total: int 

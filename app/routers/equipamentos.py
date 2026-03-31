@@ -5,10 +5,10 @@ from app.database import get_db
 
 router = APIRouter()
 
-@router.get("/", response_model=list[schemas.Equipamento])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Equipamento])
 def read_equipamentos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    equipamentos = crud.get_equipamentos(db, skip=skip, limit=limit)
-    return equipamentos
+    items, total = crud.get_equipamentos(db, skip=skip, limit=limit)
+    return {"items": items, "total": total}
 
 @router.get("/{equipamento_id}", response_model=schemas.Equipamento)
 def read_equipamento(equipamento_id: int, db: Session = Depends(get_db)):
