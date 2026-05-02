@@ -38,6 +38,19 @@ def read_locacoes(
     items, total = crud.get_locacoes(db, skip=skip, limit=limit, status=status)
     return {"items": items, "total": total}
 
+@router.get("/ativas", response_model=schemas.PaginatedResponse[schemas.Locacao])
+@router.get("/ativas/", response_model=schemas.PaginatedResponse[schemas.Locacao], include_in_schema=False)
+def read_locacoes_ativas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Get all active locacoes"""
+    items, total = crud.get_locacoes(db, skip=skip, limit=limit, status=StatusLocacao.ATIVA)
+    return {"items": items, "total": total}
+
+@router.get("/atrasadas", response_model=List[schemas.Locacao])
+@router.get("/atrasadas/", response_model=List[schemas.Locacao], include_in_schema=False)
+def read_locacoes_atrasadas(db: Session = Depends(get_db)):
+    """Get all overdue locacoes"""
+    return crud.get_locacoes_atrasadas(db)
+
 @router.get("/{locacao_id}", response_model=schemas.Locacao)
 def read_locacao(locacao_id: int, db: Session = Depends(get_db)):
     """Get a specific locacao by ID"""
@@ -140,17 +153,6 @@ def cancelar_locacao(
         return {"locacao": db_locacao, "message": "Locação cancelada"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-@router.get("/ativas/", response_model=schemas.PaginatedResponse[schemas.Locacao])
-def read_locacoes_ativas(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Get all active locacoes"""
-    items, total = crud.get_locacoes(db, skip=skip, limit=limit, status=StatusLocacao.ATIVA)
-    return {"items": items, "total": total}
-
-@router.get("/atrasadas/", response_model=List[schemas.Locacao])
-def read_locacoes_atrasadas(db: Session = Depends(get_db)):
-    """Get all overdue locacoes"""
-    return crud.get_locacoes_atrasadas(db)
 
 @router.post("/from-orcamento/{orcamento_id}", response_model=schemas.LocacaoResponse)
 def create_locacao_from_orcamento(

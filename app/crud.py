@@ -135,14 +135,29 @@ def devolver_equipamento(db: Session, equipamento_id: int, quantidade: int):
 
 # Orcamento CRUD
 def get_orcamento(db: Session, orcamento_id: int):
-    return db.query(models.Orcamento).options(joinedload(models.Orcamento.locacao)).filter(models.Orcamento.id == orcamento_id).first()
+    return db.query(models.Orcamento).options(
+        joinedload(models.Orcamento.cliente),
+        joinedload(models.Orcamento.funcionario),
+        joinedload(models.Orcamento.itens).joinedload(models.ItemOrcamento.equipamento),
+        joinedload(models.Orcamento.locacao),
+    ).filter(models.Orcamento.id == orcamento_id).first()
 
 def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Optional[int] = None):
-    query = db.query(models.Orcamento).order_by(models.Orcamento.id.desc())
+    base = db.query(models.Orcamento)
     if cliente_id:
-        query = query.filter(models.Orcamento.cliente_id == cliente_id)
-    total = query.count()
-    items = query.offset(skip).limit(limit).all()
+        base = base.filter(models.Orcamento.cliente_id == cliente_id)
+    total = base.count()
+    items = (
+        base.options(
+            joinedload(models.Orcamento.cliente),
+            joinedload(models.Orcamento.funcionario),
+            joinedload(models.Orcamento.itens).joinedload(models.ItemOrcamento.equipamento),
+        )
+        .order_by(models.Orcamento.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return items, total
 
 def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
@@ -399,20 +414,36 @@ def limpar_orcamentos_rejeitados(db: Session, dias: int = 30):
 def get_locacao(db: Session, locacao_id: int):
     return db.query(models.Locacao).options(
         joinedload(models.Locacao.cliente),
-        joinedload(models.Locacao.orcamento),
-        joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
+        joinedload(models.Locacao.funcionario),
+        joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.cliente),
+        joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.funcionario),
+        joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.itens).joinedload(
+            models.ItemOrcamento.equipamento
+        ),
+        joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento),
     ).filter(models.Locacao.id == locacao_id).first()
 
 def get_locacoes(db: Session, skip: int = 0, limit: int = 100, status: Optional[StatusLocacao] = None):
-    query = db.query(models.Locacao).order_by(models.Locacao.id.desc())
+    base = db.query(models.Locacao)
     if status:
-        query = query.filter(models.Locacao.status == status)
-    total = query.count()
-    items = query.options(
-        joinedload(models.Locacao.cliente),
-        joinedload(models.Locacao.orcamento),
-        joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento)
-    ).offset(skip).limit(limit).all()
+        base = base.filter(models.Locacao.status == status)
+    total = base.count()
+    items = (
+        base.options(
+            joinedload(models.Locacao.cliente),
+            joinedload(models.Locacao.funcionario),
+            joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.cliente),
+            joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.funcionario),
+            joinedload(models.Locacao.orcamento).joinedload(models.Orcamento.itens).joinedload(
+                models.ItemOrcamento.equipamento
+            ),
+            joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento),
+        )
+        .order_by(models.Locacao.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return items, total
 
 def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entrega: Optional[str] = None, funcionario_id: Optional[int] = None):

@@ -86,7 +86,8 @@ class ItemOrcamentoCreate(ItemOrcamentoBase):
 class ItemOrcamento(ItemOrcamentoBase):
     id: int
     orcamento_id: int
-    equipamento: Equipamento
+    # Pode ser None se houver FK órfã em bases antigas / dados migrados
+    equipamento: Optional[Equipamento] = None
 
     class Config:
         from_attributes = True
@@ -122,7 +123,7 @@ class Orcamento(OrcamentoBase):
     id: int
     status: StatusOrcamento
     data_criacao: datetime
-    cliente: Cliente
+    cliente: Optional[Cliente] = None
     funcionario: Optional['Funcionario'] = None
     itens: List[ItemOrcamento]
 
@@ -146,7 +147,7 @@ class ItemLocacaoCreate(ItemLocacaoBase):
 class ItemLocacao(ItemLocacaoBase):
     id: int
     locacao_id: int
-    equipamento: Equipamento
+    equipamento: Optional[Equipamento] = None
 
     class Config:
         from_attributes = True
@@ -207,8 +208,8 @@ class Locacao(LocacaoBase):
     data_devolucao: Optional[datetime] = None
     endereco_entrega: Optional[str] = None
     data_criacao: datetime
-    orcamento: Orcamento
-    cliente: Cliente
+    orcamento: Optional[Orcamento] = None
+    cliente: Optional[Cliente] = None
     funcionario: Optional['Funcionario'] = None
     itens: List[ItemLocacao]
 
@@ -279,4 +280,10 @@ T = TypeVar('T')
 
 class PaginatedResponse(BaseModel, Generic[T]):
     items: List[T]
-    total: int 
+    total: int
+
+# Resolve referências adiantadas (Funcionario) em todos os ambientes / versões do Pydantic
+Orcamento.model_rebuild()
+Locacao.model_rebuild()
+OrcamentoResponse.model_rebuild()
+LocacaoResponse.model_rebuild()
