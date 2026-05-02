@@ -41,6 +41,9 @@ app.add_middleware(
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+# Prefixo único da API (alinhar com o Angular: environment.apiUrl = .../api/backend)
+API_ROOT = "/api/backend"
+
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
     return JSONResponse(
@@ -58,18 +61,18 @@ async def generic_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno do servidor"},
     )
 
-# Include routers
-app.include_router(clientes.router, prefix="/backend/clientes", tags=["Clientes"])
-app.include_router(equipamentos.router, prefix="/backend/equipamentos", tags=["Equipamentos"])
-app.include_router(orcamentos.router, prefix="/backend/orcamentos", tags=["Orçamentos"])
-app.include_router(locacoes.router, prefix="/backend/locacoes", tags=["Locações"])
-app.include_router(funcionarios.router, prefix="/backend/funcionarios", tags=["Funcionários"])
-app.include_router(logs.router, prefix="/backend/logs", tags=["Logs"])
-app.include_router(relatorios.router, prefix="/backend/relatorios", tags=["Relatórios"])
-app.include_router(upload.router, prefix="/backend/upload", tags=["Upload"])
-app.include_router(config.router, prefix="/backend/config", tags=["Config"])
-app.include_router(pdf.router, prefix="/backend/pdf", tags=["PDF"])
+# Include routers (URLs absolutas: /api/backend/clientes, /api/backend/relatorios/orcamentos, ...)
+app.include_router(clientes.router, prefix=f"{API_ROOT}/clientes", tags=["Clientes"])
+app.include_router(equipamentos.router, prefix=f"{API_ROOT}/equipamentos", tags=["Equipamentos"])
+app.include_router(orcamentos.router, prefix=f"{API_ROOT}/orcamentos", tags=["Orçamentos"])
+app.include_router(locacoes.router, prefix=f"{API_ROOT}/locacoes", tags=["Locações"])
+app.include_router(funcionarios.router, prefix=f"{API_ROOT}/funcionarios", tags=["Funcionários"])
+app.include_router(logs.router, prefix=f"{API_ROOT}/logs", tags=["Logs"])
+app.include_router(relatorios.router, prefix=f"{API_ROOT}/relatorios", tags=["Relatórios"])
+app.include_router(upload.router, prefix=f"{API_ROOT}/upload", tags=["Upload"])
+app.include_router(config.router, prefix=f"{API_ROOT}/config", tags=["Config"])
+app.include_router(pdf.router, prefix=f"{API_ROOT}/pdf", tags=["PDF"])
 
-@app.get("/backend")
-async def root():
-    return {"message": "R-Loc API - Sistema de Locação de Equipamentos"} 
+@app.get(API_ROOT)
+async def api_backend_root():
+    return {"message": "R-Loc API - Sistema de Locação de Equipamentos"}

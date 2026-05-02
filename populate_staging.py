@@ -7,9 +7,9 @@ import random
 from datetime import datetime, timedelta
 from typing import List, Dict
 
-# URL da API (alterar para staging quando necessário)
-# API_URL = "http://137.131.201.11/api"
-API_URL = "http://localhost:8000"
+# URL da API — mesmo prefixo que main.py (API_ROOT = /api/backend)
+# API_URL = "http://137.131.201.11/api/backend"
+API_URL = "http://localhost:8000/api/backend"
 # API_URL = "https://srv938431.hstgr.cloud/api"
 # Dados realistas para gera
 CLIENTES_PF = [
