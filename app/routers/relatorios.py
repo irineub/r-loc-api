@@ -9,6 +9,7 @@ from app import models, schemas
 router = APIRouter()
 
 @router.get("/orcamentos", response_model=List[schemas.Orcamento])
+@router.get("/orcamentos/", response_model=List[schemas.Orcamento], include_in_schema=False)
 def relatorio_orcamentos(
     data_inicio: Optional[datetime] = None,
     data_fim: Optional[datetime] = None,
@@ -25,6 +26,7 @@ def relatorio_orcamentos(
     return query.order_by(models.Orcamento.data_criacao.desc()).all()
 
 @router.get("/locacoes", response_model=List[schemas.Locacao])
+@router.get("/locacoes/", response_model=List[schemas.Locacao], include_in_schema=False)
 def relatorio_locacoes(
     data_inicio: Optional[datetime] = None,
     data_fim: Optional[datetime] = None,
@@ -41,6 +43,7 @@ def relatorio_locacoes(
     return query.order_by(models.Locacao.data_criacao.desc()).all()
 
 @router.get("/clientes", response_model=List[schemas.Cliente])
+@router.get("/clientes/", response_model=List[schemas.Cliente], include_in_schema=False)
 def relatorio_clientes(
     data_inicio: Optional[datetime] = None,
     data_fim: Optional[datetime] = None,
@@ -54,6 +57,7 @@ def relatorio_clientes(
     return query.order_by(models.Cliente.data_cadastro.desc()).all()
 
 @router.get("/equipamentos", response_model=List[schemas.Equipamento])
+@router.get("/equipamentos/", response_model=List[schemas.Equipamento], include_in_schema=False)
 def relatorio_equipamentos(
     db: Session = Depends(get_db)
 ):
