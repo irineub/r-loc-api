@@ -242,6 +242,13 @@ class FuncionarioLogin(BaseModel):
     username: str
     senha: str
 
+class FuncionarioSenhaConsultaRequest(BaseModel):
+    senha_autorizacao: str
+
+class FuncionarioSenhaConsultaResponse(BaseModel):
+    senha: Optional[str] = None
+    message: Optional[str] = None
+
 class Funcionario(FuncionarioBase):
     id: int
     data_cadastro: datetime

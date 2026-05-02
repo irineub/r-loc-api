@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.database import get_db
 from app import crud, schemas
-from app.auth import require_master
+from app.auth import require_master, verify_senha_desconto
 
 router = APIRouter()
 
@@ -42,6 +42,35 @@ def read_funcionario(
     if db_funcionario is None:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
     return db_funcionario
+
+@router.post(
+    "/{funcionario_id}/consultar-senha",
+    response_model=schemas.FuncionarioSenhaConsultaResponse,
+)
+def consultar_senha_funcionario(
+    funcionario_id: int,
+    body: schemas.FuncionarioSenhaConsultaRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(require_master),
+):
+    """
+    Retorna a última senha definida para o funcionário (texto), após validar a senha de desconto.
+    Cadastros antigos sem valor guardado não podem ser recuperados.
+    """
+    if not verify_senha_desconto(body.senha_autorizacao):
+        raise HTTPException(status_code=403, detail="Senha de autorização incorreta")
+    db_funcionario = crud.get_funcionario(db, funcionario_id=funcionario_id)
+    if db_funcionario is None:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+    if not db_funcionario.senha_ultima_definida:
+        return schemas.FuncionarioSenhaConsultaResponse(
+            senha=None,
+            message=(
+                "Ainda não há senha gravada para consulta. "
+                "Peça ao funcionário para fazer login uma vez com a senha atual, ou edite o cadastro e salve uma nova senha."
+            ),
+        )
+    return schemas.FuncionarioSenhaConsultaResponse(senha=db_funcionario.senha_ultima_definida)
 
 @router.put("/{funcionario_id}", response_model=schemas.Funcionario)
 @router.patch("/{funcionario_id}", response_model=schemas.Funcionario)

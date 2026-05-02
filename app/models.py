@@ -163,6 +163,8 @@ class Funcionario(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     senha_hash = Column(String(255), nullable=False)
+    # Última senha em texto (preenchida ao criar/alterar senha) — só para consulta protegida por senha de desconto
+    senha_ultima_definida = Column(Text, nullable=True)
     nome = Column(String(200), nullable=False)
     ativo = Column(Boolean, default=True, nullable=False)
     data_cadastro = Column(DateTime(timezone=True), server_default=func.now())

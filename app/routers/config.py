@@ -3,9 +3,16 @@ from pydantic import BaseModel
 import json
 import os
 
+from app.auth import require_master
+
 router = APIRouter()
 
 CONFIG_FILE = "system_config.json"
+
+
+def _system_config_abs_path() -> str:
+    """system_config.json na raiz do pacote r-loc-api (mesmo critério de app.auth)."""
+    return os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "system_config.json")
 
 class UazapiConfig(BaseModel):
     url: str
@@ -140,6 +147,34 @@ async def get_assinatura_config():
     except Exception as e:
         print(f"Error reading assinatura config: {e}")
         return default
+
+class SenhaDescontoBody(BaseModel):
+    senha: str
+
+
+@router.post("/senha-desconto")
+async def update_senha_desconto(body: SenhaDescontoBody, _: str = Depends(require_master)):
+    """Persiste a senha de desconto no servidor (alinhada ao front) para validar consulta de senhas de funcionários."""
+    if not body.senha or len(body.senha) < 1:
+        raise HTTPException(status_code=400, detail="Senha inválida")
+    cfg_api = _system_config_abs_path()
+    cwd_cfg = os.path.abspath(CONFIG_FILE)
+    write_path = cwd_cfg if os.path.exists(CONFIG_FILE) else cfg_api
+    current_config = {}
+    if os.path.exists(write_path):
+        try:
+            with open(write_path, "r", encoding="utf-8") as f:
+                current_config = json.load(f)
+        except Exception:
+            pass
+    current_config["senha_desconto"] = body.senha
+    try:
+        with open(write_path, "w", encoding="utf-8") as f:
+            json.dump(current_config, f, indent=2)
+        return {"message": "Senha de desconto sincronizada no servidor"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar: {str(e)}")
+
 
 @router.post("/assinatura")
 async def update_assinatura_config(config: AssinaturaConfig):

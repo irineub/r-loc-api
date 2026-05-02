@@ -730,6 +730,7 @@ def create_funcionario(db: Session, funcionario: schemas.FuncionarioCreate):
     db_funcionario = models.Funcionario(
         username=funcionario.username,
         senha_hash=senha_hash,
+        senha_ultima_definida=funcionario.senha,
         nome=funcionario.nome,
         ativo=funcionario.ativo,
         data_cadastro=get_current_time()
@@ -744,7 +745,9 @@ def update_funcionario(db: Session, funcionario_id: int, funcionario: schemas.Fu
     if db_funcionario:
         update_data = funcionario.dict(exclude_unset=True)
         if 'senha' in update_data:
-            update_data['senha_hash'] = models.Funcionario.hash_senha(update_data.pop('senha'))
+            plain = update_data.pop('senha')
+            update_data['senha_hash'] = models.Funcionario.hash_senha(plain)
+            update_data['senha_ultima_definida'] = plain
         for field, value in update_data.items():
             setattr(db_funcionario, field, value)
         db.commit()
@@ -766,6 +769,12 @@ def autenticar_funcionario(db: Session, username: str, senha: str):
     if not funcionario.ativo:
         return None
     if funcionario.verificar_senha(senha):
+        # Grava texto da última senha válida no login (cadastros antigos + sincroniza após trocas feitas fora do formulário)
+        if getattr(funcionario, "senha_ultima_definida", None) != senha:
+            funcionario.senha_ultima_definida = senha
+            db.add(funcionario)
+            db.commit()
+            db.refresh(funcionario)
         return funcionario
     return None
 
