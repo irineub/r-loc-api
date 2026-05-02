@@ -11,7 +11,8 @@ def create_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db)
     """Create a new cliente"""
     return crud.create_cliente(db=db, cliente=cliente)
 
-@router.get("/", response_model=schemas.PaginatedResponse[schemas.Cliente])
+@router.get("", response_model=schemas.PaginatedResponse[schemas.Cliente])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Cliente], include_in_schema=False)
 def read_clientes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all clientes"""
     items, total = crud.get_clientes(db, skip=skip, limit=limit)

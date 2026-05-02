@@ -40,7 +40,8 @@ def create_orcamento(
     
     return db_orcamento
 
-@router.get("/", response_model=schemas.PaginatedResponse[schemas.Orcamento])
+@router.get("", response_model=schemas.PaginatedResponse[schemas.Orcamento])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Orcamento], include_in_schema=False)
 def read_orcamentos(
     skip: int = 0, 
     limit: int = 100, 

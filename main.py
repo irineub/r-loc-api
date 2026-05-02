@@ -41,8 +41,9 @@ app.add_middleware(
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-# Prefixo único da API (alinhar com o Angular: environment.apiUrl = .../api/backend)
-API_ROOT = "/api/backend"
+# Caminho no uvicorn. O proxy público costuma mapear /api/backend/* → /backend/* (o log do uvicorn
+# mostra GET /backend/... e não /api/backend/...). Se mudar o nginx, ajuste aqui em conjunto.
+API_ROOT = "/backend"
 
 @app.exception_handler(ValueError)
 async def value_error_handler(request: Request, exc: ValueError):
@@ -61,7 +62,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno do servidor"},
     )
 
-# Include routers (URLs absolutas: /api/backend/clientes, /api/backend/relatorios/orcamentos, ...)
+# Include routers (no uvicorn: /backend/clientes, /backend/relatorios/orcamentos, ...)
 app.include_router(clientes.router, prefix=f"{API_ROOT}/clientes", tags=["Clientes"])
 app.include_router(equipamentos.router, prefix=f"{API_ROOT}/equipamentos", tags=["Equipamentos"])
 app.include_router(orcamentos.router, prefix=f"{API_ROOT}/orcamentos", tags=["Orçamentos"])

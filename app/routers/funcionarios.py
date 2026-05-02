@@ -19,7 +19,8 @@ def create_funcionario(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=schemas.PaginatedResponse[schemas.Funcionario])
+@router.get("", response_model=schemas.PaginatedResponse[schemas.Funcionario])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Funcionario], include_in_schema=False)
 def read_funcionarios(
     skip: int = 0, 
     limit: int = 100,

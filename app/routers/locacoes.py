@@ -26,7 +26,8 @@ def create_locacao(locacao: schemas.LocacaoCreate, db: Session = Depends(get_db)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/", response_model=schemas.PaginatedResponse[schemas.Locacao])
+@router.get("", response_model=schemas.PaginatedResponse[schemas.Locacao])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Locacao], include_in_schema=False)
 def read_locacoes(
     skip: int = 0, 
     limit: int = 100, 

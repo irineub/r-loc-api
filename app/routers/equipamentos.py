@@ -5,7 +5,8 @@ from app.database import get_db
 
 router = APIRouter()
 
-@router.get("/", response_model=schemas.PaginatedResponse[schemas.Equipamento])
+@router.get("", response_model=schemas.PaginatedResponse[schemas.Equipamento])
+@router.get("/", response_model=schemas.PaginatedResponse[schemas.Equipamento], include_in_schema=False)
 def read_equipamentos(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     items, total = crud.get_equipamentos(db, skip=skip, limit=limit)
     return {"items": items, "total": total}
