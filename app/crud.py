@@ -167,76 +167,119 @@ def get_orcamentos_aprovados(db: Session, skip: int = 0, limit: int = 100):
     items = query.offset(skip).limit(limit).all()
     return items, total
 
-def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
-    # Agrupar quantidades por equipamento
-    equipamentos_quantidades = {}
-    for item in orcamento.itens:
+def _agrupar_quantidades_por_equipamento(itens) -> Dict[int, int]:
+    agrupado: Dict[int, int] = {}
+    for item in itens:
         equipamento_id = item.equipamento_id
-        if equipamento_id not in equipamentos_quantidades:
-            equipamentos_quantidades[equipamento_id] = 0
-        equipamentos_quantidades[equipamento_id] += item.quantidade
-    
-    # Verificar se todos os equipamentos existem
-    equipamentos_db = {}
-    for equipamento_id in equipamentos_quantidades.keys():
+        agrupado[equipamento_id] = agrupado.get(equipamento_id, 0) + item.quantidade
+    return agrupado
+
+
+def _orcamento_reserva_estoque(status, locacao) -> bool:
+    """Somente orçamento aprovado e ainda sem contrato ocupa estoque."""
+    return status == StatusOrcamento.APROVADO and locacao is None
+
+
+def _liberar_estoque_itens(db: Session, itens):
+    for item in itens:
+        db_equipamento = get_equipamento(db, item.equipamento_id)
+        if db_equipamento:
+            db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item.quantidade)
+
+
+def _reservar_estoque_itens(db: Session, itens, contexto: str = "reservar estoque"):
+    agrupado = _agrupar_quantidades_por_equipamento(itens)
+    faltando = []
+    equipamentos_locked = {}
+
+    for equipamento_id, quantidade_total in agrupado.items():
+        db_equipamento = db.query(models.Equipamento).filter(
+            models.Equipamento.id == equipamento_id
+        ).with_for_update().first()
+
+        if not db_equipamento:
+            db.rollback()
+            raise ValueError(f"Equipamento ID {equipamento_id} não encontrado ao {contexto}")
+
+        estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
+        if estoque_disponivel < quantidade_total:
+            faltando.append(
+                f"'{db_equipamento.descricao}': disponível {estoque_disponivel}, solicitado {quantidade_total}"
+            )
+        equipamentos_locked[equipamento_id] = (db_equipamento, quantidade_total)
+
+    if faltando:
+        db.rollback()
+        raise ValueError(
+            "Estoque insuficiente para aprovar o orçamento. "
+            "Ajuste as quantidades e tente novamente. " + "; ".join(faltando)
+        )
+
+    for db_equipamento, quantidade_total in equipamentos_locked.values():
+        db_equipamento.estoque_alugado += quantidade_total
+
+
+def _validar_estoque_disponivel(db: Session, itens, extra_liberar: Optional[Dict[int, int]] = None):
+    """Valida contra estoque físico já alugado/reservado (locações + orçamentos aprovados)."""
+    extra_liberar = extra_liberar or {}
+    agrupado = _agrupar_quantidades_por_equipamento(itens)
+    for equipamento_id, quantidade_total in agrupado.items():
         db_equipamento = get_equipamento(db, equipamento_id)
         if not db_equipamento:
             raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
-        equipamentos_db[equipamento_id] = db_equipamento
-    
-    # Validar estoque ANTES de criar qualquer coisa (primeira validação)
-    for equipamento_id, quantidade_total in equipamentos_quantidades.items():
-        db_equipamento = equipamentos_db[equipamento_id]
-        estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
-        
-        if estoque_disponivel <= 0:
-            raise ValueError(
-                f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
-                f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, Disponível: {estoque_disponivel}"
-            )
-        
-        if quantidade_total > estoque_disponivel:
+        disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado + extra_liberar.get(equipamento_id, 0)
+        if quantidade_total > disponivel:
             raise ValueError(
                 f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
-                f"Disponível: {estoque_disponivel}, Solicitado: {quantidade_total}"
+                f"Disponível: {disponivel}, Solicitado: {quantidade_total}"
             )
-    
-    # Criar orçamento
+
+
+def recalcular_estoque_alugado(db: Session):
+    """Recalcula estoque_alugado a partir de locações ativas/atrasadas e orçamentos aprovados sem contrato."""
+    from sqlalchemy import func
+
+    equipamentos = db.query(models.Equipamento).all()
+    for eq in equipamentos:
+        locacao_qtd = db.query(
+            func.coalesce(func.sum(models.ItemLocacao.quantidade - models.ItemLocacao.quantidade_devolvida), 0)
+        ).join(models.Locacao).filter(
+            models.ItemLocacao.equipamento_id == eq.id,
+            models.Locacao.status.in_([StatusLocacao.ATIVA, StatusLocacao.ATRASADA]),
+        ).scalar()
+
+        orcamento_qtd = db.query(
+            func.coalesce(func.sum(models.ItemOrcamento.quantidade), 0)
+        ).join(models.Orcamento).outerjoin(
+            models.Locacao, models.Locacao.orcamento_id == models.Orcamento.id
+        ).filter(
+            models.ItemOrcamento.equipamento_id == eq.id,
+            models.Orcamento.status == StatusOrcamento.APROVADO,
+            models.Locacao.id.is_(None),
+        ).scalar()
+
+        eq.estoque_alugado = int(locacao_qtd or 0) + int(orcamento_qtd or 0)
+
+
+def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):
+    equipamentos_quantidades = _agrupar_quantidades_por_equipamento(orcamento.itens)
+
+    for equipamento_id in equipamentos_quantidades.keys():
+        if not get_equipamento(db, equipamento_id):
+            raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
+
+    # Orçamento pendente não ocupa estoque. A validação impede só quantidade acima do estoque físico atual.
+    _validar_estoque_disponivel(db, orcamento.itens)
+
     orcamento_data = orcamento.dict(exclude={'itens'})
     orcamento_data["data_criacao"] = get_current_time()
     db_orcamento = models.Orcamento(**orcamento_data)
     db.add(db_orcamento)
-    db.flush()  # Flush para obter o ID sem commit
-    
-    # Criar itens e reservar estoque (com validação final antes de reservar)
+    db.flush()
+
     for item in orcamento.itens:
-        # Revalidar estoque ANTES de reservar (evita race condition)
-        db_equipamento = db.query(models.Equipamento).filter(
-            models.Equipamento.id == item.equipamento_id
-        ).with_for_update().first()  # Lock pessimista para evitar race condition
-        
-        if not db_equipamento:
-            db.rollback()
-            raise ValueError(f"Equipamento ID {item.equipamento_id} não encontrado durante a reserva")
-        
-        estoque_disponivel_atual = db_equipamento.estoque - db_equipamento.estoque_alugado
-        
-        if estoque_disponivel_atual < item.quantidade:
-            db.rollback()
-            raise ValueError(
-                f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}' durante a reserva. "
-                f"Disponível: {estoque_disponivel_atual}, Solicitado: {item.quantidade}. "
-                f"O estoque pode ter sido reservado por outro orçamento."
-            )
-        
-        # Criar item
-        db_item = models.ItemOrcamento(**item.dict(), orcamento_id=db_orcamento.id)
-        db.add(db_item)
-        
-        # Reservar estoque (incrementar estoque_alugado)
-        db_equipamento.estoque_alugado += item.quantidade
-    
-    # Commit final (tudo ou nada)
+        db.add(models.ItemOrcamento(**item.dict(), orcamento_id=db_orcamento.id))
+
     db.commit()
     db.refresh(db_orcamento)
     return db_orcamento
@@ -247,112 +290,48 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
         update_data = orcamento.dict(exclude_unset=True, exclude={'itens', 'status'})
         for field, value in update_data.items():
             setattr(db_orcamento, field, value)
-        
+
         old_status = db_orcamento.status
-        
+        tinha_reserva = _orcamento_reserva_estoque(old_status, db_orcamento.locacao)
+
         # Se estava rejeitado e está editando, voltar para pendente
-        # Mas só se não tiver locação gerada
         if db_orcamento.status == models.StatusOrcamento.REJEITADO and db_orcamento.locacao is None:
             db_orcamento.status = models.StatusOrcamento.PENDENTE
-        
-        # Atualizar status se fornecido explicitamente
+
         if orcamento.status is not None:
             db_orcamento.status = orcamento.status
-            
-        # Determinar se houve reativação (REJEITADO -> outra coisa)
-        # Se foi reativado e NÃO vamos mexer nos itens (abaixo), precisamos reservar o estoque dos itens existentes
-        is_reactivated = (old_status == models.StatusOrcamento.REJEITADO and 
-                          db_orcamento.status != models.StatusOrcamento.REJEITADO)
-        
+
         has_new_items = 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None
-        
-        if is_reactivated and not has_new_items:
-             # Re-reservar estoque dos itens existentes
-             for item in db_orcamento.itens:
-                 db_equipamento = get_equipamento(db, item.equipamento_id)
-                 if db_equipamento:
-                     # Verificar disponibilidade antes de reservar
-                     estoque_disponivel = db_equipamento.estoque - db_equipamento.estoque_alugado
-                     if estoque_disponivel < item.quantidade:
-                         raise ValueError(f"Estoque insuficiente ao reativar orçamento para {db_equipamento.descricao}")
-                     
-                     db_equipamento.estoque_alugado += item.quantidade
-        
-        # Atualizar itens se fornecidos
-        if 'itens' in orcamento.dict(exclude_unset=True) and orcamento.itens is not None:
-            # Buscar itens antigos antes de deletar para liberar estoque
+        tera_reserva = _orcamento_reserva_estoque(db_orcamento.status, db_orcamento.locacao)
+
+        if has_new_items:
             itens_antigos = db.query(models.ItemOrcamento).filter(
                 models.ItemOrcamento.orcamento_id == orcamento_id
             ).all()
-            
-            # Calcular quantidades dos itens antigos por equipamento
-            equipamentos_antigos_quantidades = {}
-            for item_antigo in itens_antigos:
-                equipamento_id = item_antigo.equipamento_id
-                if equipamento_id not in equipamentos_antigos_quantidades:
-                    equipamentos_antigos_quantidades[equipamento_id] = 0
-                equipamentos_antigos_quantidades[equipamento_id] += item_antigo.quantidade
-            
-            # Calcular quantidades dos novos itens
-            equipamentos_quantidades = {}
-            for item in orcamento.itens:
-                equipamento_id = item.equipamento_id
-                if equipamento_id not in equipamentos_quantidades:
-                    equipamentos_quantidades[equipamento_id] = 0
-                equipamentos_quantidades[equipamento_id] += item.quantidade
-            
-            # Validar estoque ANTES de liberar os itens antigos
-            # Precisamos considerar que os itens antigos já estão reservados e serão liberados
-            for equipamento_id, quantidade_total in equipamentos_quantidades.items():
-                db_equipamento = get_equipamento(db, equipamento_id)
-                if not db_equipamento:
-                    raise ValueError(f"Equipamento ID {equipamento_id} não encontrado")
-                
-                # Calcular estoque disponível considerando que os itens antigos serão liberados
-                quantidade_antiga = equipamentos_antigos_quantidades.get(equipamento_id, 0)
-                # O estoque disponível atual + a quantidade que será liberada dos itens antigos
-                estoque_disponivel_atual = db_equipamento.estoque - db_equipamento.estoque_alugado
-                estoque_disponivel_apos_liberacao = estoque_disponivel_atual + quantidade_antiga
-                
-                # Validar se há estoque disponível após liberar os itens antigos
-                if estoque_disponivel_apos_liberacao <= 0:
-                    raise ValueError(
-                        f"Equipamento '{db_equipamento.descricao}' não possui estoque disponível. "
-                        f"Estoque total: {db_equipamento.estoque}, Alugado: {db_equipamento.estoque_alugado}, "
-                        f"Disponível atual: {estoque_disponivel_atual}, Após liberar itens antigos: {estoque_disponivel_apos_liberacao}"
-                    )
-                
-                if quantidade_total > estoque_disponivel_apos_liberacao:
-                    raise ValueError(
-                        f"Estoque insuficiente para o equipamento '{db_equipamento.descricao}'. "
-                        f"Disponível após liberar itens antigos: {estoque_disponivel_apos_liberacao}, Solicitado: {quantidade_total}"
-                    )
-            
-            # Agora sim, liberar estoque dos itens antigos (só se não tiver locação gerada E não estava rejeitado)
-            # Se estava rejeitado, o estoque já foi liberado quando foi rejeitado
-            if db_orcamento.locacao is None and db_orcamento.status != models.StatusOrcamento.REJEITADO:
-                for item_antigo in itens_antigos:
-                    db_equipamento = get_equipamento(db, item_antigo.equipamento_id)
-                    if db_equipamento:
-                        # Liberar o estoque que estava reservado para este item
-                        db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item_antigo.quantidade)
-            
-            # Deletar itens antigos
+
+            extra_liberar = {}
+            if tinha_reserva:
+                extra_liberar = _agrupar_quantidades_por_equipamento(itens_antigos)
+
+            _validar_estoque_disponivel(db, orcamento.itens, extra_liberar=extra_liberar)
+
+            if tinha_reserva:
+                _liberar_estoque_itens(db, itens_antigos)
+
             db.query(models.ItemOrcamento).filter(
                 models.ItemOrcamento.orcamento_id == orcamento_id
             ).delete()
-            
-            # Criar novos itens e reservar estoque (só se não tiver locação gerada)
+
             for item in orcamento.itens:
-                db_item = models.ItemOrcamento(**item.dict(), orcamento_id=orcamento_id)
-                db.add(db_item)
-                
-                # Reservar estoque para o novo item (só se não tiver locação gerada)
-                if db_orcamento.locacao is None:
-                    db_equipamento = get_equipamento(db, item.equipamento_id)
-                    if db_equipamento:
-                        db_equipamento.estoque_alugado += item.quantidade
-        
+                db.add(models.ItemOrcamento(**item.dict(), orcamento_id=orcamento_id))
+
+            db.flush()
+
+            if tera_reserva:
+                _reservar_estoque_itens(db, orcamento.itens, contexto="atualizar orçamento aprovado")
+        elif tera_reserva and not tinha_reserva:
+            _reservar_estoque_itens(db, db_orcamento.itens, contexto="ativar reserva do orçamento")
+
         db.commit()
         db.refresh(db_orcamento)
     return db_orcamento
@@ -360,6 +339,10 @@ def update_orcamento(db: Session, orcamento_id: int, orcamento: schemas.Orcament
 def aprovar_orcamento(db: Session, orcamento_id: int):
     db_orcamento = get_orcamento(db, orcamento_id)
     if db_orcamento and db_orcamento.status == StatusOrcamento.PENDENTE:
+        if not db_orcamento.itens:
+            raise ValueError("Não é possível aprovar um orçamento sem itens.")
+        # Reserva efetiva só na aprovação, com lock para não aprovar acima do estoque.
+        _reservar_estoque_itens(db, db_orcamento.itens, contexto="aprovar orçamento")
         db_orcamento.status = StatusOrcamento.APROVADO
         db.commit()
         db.refresh(db_orcamento)
@@ -368,16 +351,9 @@ def aprovar_orcamento(db: Session, orcamento_id: int):
 def rejeitar_orcamento(db: Session, orcamento_id: int):
     db_orcamento = get_orcamento(db, orcamento_id)
     if db_orcamento and db_orcamento.status == StatusOrcamento.PENDENTE:
-        # Liberar estoque dos itens do orçamento rejeitado (só se não tiver locação gerada)
-        if db_orcamento.locacao is None:
-            for item in db_orcamento.itens:
-                db_equipamento = get_equipamento(db, item.equipamento_id)
-                if db_equipamento:
-                    # Liberar o estoque que estava reservado para este item
-                    db_equipamento.estoque_alugado = max(0, db_equipamento.estoque_alugado - item.quantidade)
-        
+        # Pendente não ocupa estoque; não há reserva para liberar.
         db_orcamento.status = StatusOrcamento.REJEITADO
-        db_orcamento.data_rejeicao = get_current_time()  # Salvar data de rejeição
+        db_orcamento.data_rejeicao = get_current_time()
         db.commit()
         db.refresh(db_orcamento)
     return db_orcamento
@@ -488,25 +464,11 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
             db.rollback()
             raise ValueError(f"Equipamento {item_orcamento.equipamento_id} não encontrado")
         
-        # Verificar disponibilidade
+        # O estoque já foi reservado na aprovação do orçamento.
         estoque_disponivel = equipamento.estoque - equipamento.estoque_alugado
-        # Nota: Como o orçamento já reservou o estoque, tecnicamente o estoque_disponivel conta com essa reserva.
-        # Se o item do orçamento está reservado, ele está em estoque_alugado.
-        # Então se fizermos estoque - estoque_alugado, a quantidade do nosso item JÁ está subtraída?
-        # Sim. Se o orçamento reservou 5, estoque 10 -> alugado 5 -> disponivel 5.
-        # Mas para ESTA locação, queremos usar aqueles 5 reservados.
-        # Então a validação abaixo iria falhar se tentássemos alugar mais do que o restante.
-        # MAS, estamos convertendo O PRÓPRIO orçamento.
-        # Então a validação abaixo está incorreta se bloquear.
-        # Se 'estoque_disponivel' é o que sobra ALÉM da nossa reserva, então OK verificar se é < 0?
-        # Não. A verificação correta seria: (estoque - (estoque_alugado - item.quantidade)) < item.quantidade
-        # Ou simplesmente confiar na reserva do orçamento.
-        # REMOVENDO VALIDAÇÃO REDUNDANTE QUE PODE FALHAR FALSAMENTE
-        # (Já que o orçamento aprovado garante a reserva)
-        
-        if estoque_disponivel < 0: # Apenas sanidade grave
-             db.rollback()
-             raise ValueError(f"Estoque inconsistente para {equipamento.descricao}")
+        if estoque_disponivel < 0:
+            db.rollback()
+            raise ValueError(f"Estoque inconsistente para {equipamento.descricao}")
         
         # Criar item da locação
         item_locacao_data = {
@@ -523,8 +485,6 @@ def create_locacao_from_orcamento(db: Session, orcamento_id: int, endereco_entre
         
         db_item_locacao = models.ItemLocacao(**item_locacao_data)
         db.add(db_item_locacao)
-        
-        # O estoque já foi reservado quando o orçamento foi criado/aprovado.
     
     db.commit()
     return db_locacao
