@@ -56,9 +56,8 @@ def read_orcamentos(
 @router.get("/pendentes/", response_model=schemas.PaginatedResponse[schemas.Orcamento], include_in_schema=False)
 def read_orcamentos_pendentes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all pending orcamentos"""
-    items, _ = crud.get_orcamentos(db, skip=0, limit=10000)
-    pendentes = [orc for orc in items if orc.status == StatusOrcamento.PENDENTE]
-    return {"items": pendentes[skip : skip + limit], "total": len(pendentes)}
+    items, total = crud.get_orcamentos_pendentes(db, skip=skip, limit=limit)
+    return {"items": items, "total": total}
 
 @router.get("/aprovados", response_model=schemas.PaginatedResponse[schemas.Orcamento])
 @router.get("/aprovados/", response_model=schemas.PaginatedResponse[schemas.Orcamento], include_in_schema=False)

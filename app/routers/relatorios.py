@@ -4,9 +4,14 @@ from sqlalchemy import and_
 from typing import List, Optional
 from datetime import datetime
 from app.database import get_db
-from app import models, schemas
+from app import models, schemas, crud
 
 router = APIRouter()
+
+@router.get("/dashboard", response_model=schemas.DashboardResumo)
+@router.get("/dashboard/", response_model=schemas.DashboardResumo, include_in_schema=False)
+def dashboard_resumo(db: Session = Depends(get_db)):
+    return crud.get_dashboard_resumo(db)
 
 @router.get("/orcamentos", response_model=List[schemas.Orcamento])
 @router.get("/orcamentos/", response_model=List[schemas.Orcamento], include_in_schema=False)

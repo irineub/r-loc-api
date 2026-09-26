@@ -36,10 +36,10 @@ class Cliente(ClienteBase):
 class EquipamentoBase(BaseModel):
     descricao: str
     unidade: str
-    preco_diaria: float = Field(..., gt=0)
-    preco_semanal: float = Field(..., gt=0)
-    preco_quinzenal: float = Field(..., gt=0)
-    preco_mensal: float = Field(..., gt=0)
+    preco_diaria: float = Field(..., ge=0)
+    preco_semanal: float = Field(..., ge=0)
+    preco_quinzenal: float = Field(..., ge=0)
+    preco_mensal: float = Field(..., ge=0)
     estoque: int = 1
     estoque_alugado: int = 0
 
@@ -49,10 +49,10 @@ class EquipamentoCreate(EquipamentoBase):
 class EquipamentoUpdate(BaseModel):
     descricao: Optional[str] = None
     unidade: Optional[str] = None
-    preco_diaria: Optional[float] = Field(None, gt=0)
-    preco_semanal: Optional[float] = Field(None, gt=0)
-    preco_quinzenal: Optional[float] = Field(None, gt=0)
-    preco_mensal: Optional[float] = Field(None, gt=0)
+    preco_diaria: Optional[float] = Field(None, ge=0)
+    preco_semanal: Optional[float] = Field(None, ge=0)
+    preco_quinzenal: Optional[float] = Field(None, ge=0)
+    preco_mensal: Optional[float] = Field(None, ge=0)
     estoque: Optional[int] = None
 
 class Equipamento(EquipamentoBase):
@@ -72,13 +72,13 @@ class Equipamento(EquipamentoBase):
 # ItemOrcamento Schemas
 class ItemOrcamentoBase(BaseModel):
     equipamento_id: int
-    quantidade: int = Field(..., gt=0)
-    preco_unitario: float = Field(..., gt=0)
-    dias: int = Field(..., gt=0)
+    quantidade: int = Field(..., ge=0)
+    preco_unitario: float = Field(..., ge=0)
+    dias: int = Field(..., ge=0)
     data_inicio: Optional[datetime] = None
     data_fim: Optional[datetime] = None
     tipo_cobranca: str = Field(default='diaria')
-    subtotal: float = Field(..., gt=0)
+    subtotal: float = Field(..., ge=0)
 
 class ItemOrcamentoCreate(ItemOrcamentoBase):
     pass
@@ -100,7 +100,7 @@ class OrcamentoBase(BaseModel):
     desconto: float = Field(default=0.0, ge=0)
     desconto_percentual: float = Field(default=0.0, ge=0, le=100)
     frete: float = Field(default=0.0, ge=0)
-    total_final: float = Field(..., gt=0)
+    total_final: float = Field(..., ge=0)
     observacoes: Optional[str] = None
     funcionario_id: Optional[int] = None
 
@@ -113,7 +113,7 @@ class OrcamentoUpdate(BaseModel):
     desconto: Optional[float] = Field(None, ge=0)
     desconto_percentual: Optional[float] = Field(None, ge=0, le=100)
     frete: Optional[float] = Field(None, ge=0)
-    total_final: Optional[float] = Field(None, gt=0)
+    total_final: Optional[float] = Field(None, ge=0)
     observacoes: Optional[str] = None
     itens: Optional[List[ItemOrcamentoCreate]] = None
     status: Optional[StatusOrcamento] = None
@@ -133,13 +133,13 @@ class Orcamento(OrcamentoBase):
 # ItemLocacao Schemas
 class ItemLocacaoBase(BaseModel):
     equipamento_id: int
-    quantidade: int = Field(..., gt=0)
+    quantidade: int = Field(..., ge=0)
     quantidade_devolvida: int | None = None
-    preco_unitario: float = Field(..., gt=0)
-    dias: int = Field(..., gt=0)
+    preco_unitario: float = Field(..., ge=0)
+    dias: int = Field(..., ge=0)
     data_inicio: Optional[datetime] = None
     data_fim: Optional[datetime] = None
-    subtotal: float = Field(..., gt=0)
+    subtotal: float = Field(..., ge=0)
 
 class ItemLocacaoCreate(ItemLocacaoBase):
     pass
@@ -161,7 +161,7 @@ class LocacaoBase(BaseModel):
     frete: Optional[float] = 0.0
     desconto: Optional[float] = 0.0
     desconto_percentual: Optional[float] = 0.0
-    total_final: float = Field(..., gt=0)
+    total_final: float = Field(..., ge=0)
     observacoes: Optional[str] = None
     endereco_entrega: Optional[str] = None
     funcionario_id: Optional[int] = None
@@ -227,7 +227,7 @@ class LocacaoResponse(BaseModel):
 
 # Funcionario Schemas
 class FuncionarioBase(BaseModel):
-    username: str = Field(..., min_length=3, max_length=50)
+    username: str = Field(..., min_length=1, max_length=50)
     nome: str = Field(..., min_length=1, max_length=200)
     ativo: bool = True
 
@@ -282,8 +282,61 @@ class PaginatedResponse(BaseModel, Generic[T]):
     items: List[T]
     total: int
 
+class CorrigirEstoqueRequest(BaseModel):
+    estoque: int = Field(..., ge=0)
+    recalcular_alugado: bool = True
+    estoque_alugado: Optional[int] = Field(None, ge=0)
+    motivo: Optional[str] = None
+
+class EquipamentoAlocacao(BaseModel):
+    tipo: str  # locacao | orcamento
+    id: int
+    cliente_id: Optional[int] = None
+    cliente_nome: Optional[str] = None
+    quantidade: int
+    quantidade_pendente: Optional[int] = None
+    status: Optional[str] = None
+    data_inicio: Optional[datetime] = None
+    data_fim: Optional[datetime] = None
+
+class EquipamentoAlocacoesResponse(BaseModel):
+    equipamento_id: int
+    descricao: str
+    estoque: int
+    estoque_alugado: int
+    estoque_disponivel: int
+    alocacoes: List[EquipamentoAlocacao]
+
+class DashboardCounts(BaseModel):
+    clientes: int
+    equipamentos: int
+    orcamentos: int
+    locacoes_ativas: int
+
+class DashboardTopItem(BaseModel):
+    nome: str
+    totalLocacoes: int
+    totalDias: Optional[int] = None
+    totalValor: Optional[float] = None
+
+class DashboardLocacaoResumo(BaseModel):
+    id: int
+    data_criacao: datetime
+    status: StatusLocacao
+    total_final: float
+    cliente_id: int
+
+class DashboardResumo(BaseModel):
+    totais: DashboardCounts
+    orcamentos_pendentes: List[Orcamento]
+    locacoes_ativas: List[Locacao]
+    top_equipamentos: List[DashboardTopItem]
+    top_clientes: List[DashboardTopItem]
+    locacoes_faturamento: List[DashboardLocacaoResumo]
+
 # Resolve referências adiantadas (Funcionario) em todos os ambientes / versões do Pydantic
 Orcamento.model_rebuild()
 Locacao.model_rebuild()
 OrcamentoResponse.model_rebuild()
 LocacaoResponse.model_rebuild()
+DashboardResumo.model_rebuild()

@@ -74,10 +74,11 @@ def update_equipamento(db: Session, equipamento_id: int, equipamento: schemas.Eq
             for key in update_data.keys():
                 if key not in allowed_fields and update_data[key] is not None and update_data[key] != getattr(db_equipamento, key):
                     raise ValueError(f"Não é possível alterar o campo '{key}' pois o equipamento está em uso.")
-            
-            if 'estoque' in update_data and update_data['estoque'] is not None and update_data['estoque'] < db_equipamento.estoque:
-                raise ValueError("Não é possível reduzir a quantidade em estoque de um equipamento que está atualmente em uso. Só é permitido adicionar mais unidades.")
-                
+
+        if 'estoque' in update_data and update_data['estoque'] is not None and update_data['estoque'] < db_equipamento.estoque_alugado:
+            raise ValueError(
+                f"Não é possível reduzir o estoque abaixo da quantidade em uso ({db_equipamento.estoque_alugado})."
+            )
         for key, value in update_data.items():
             setattr(db_equipamento, key, value)
         db.commit()
@@ -149,6 +150,22 @@ def get_orcamentos(db: Session, skip: int = 0, limit: int = 100, cliente_id: Opt
     total = base.count()
     items = (
         base.options(
+            joinedload(models.Orcamento.cliente),
+            joinedload(models.Orcamento.funcionario),
+            joinedload(models.Orcamento.itens).joinedload(models.ItemOrcamento.equipamento),
+        )
+        .order_by(models.Orcamento.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return items, total
+
+def get_orcamentos_pendentes(db: Session, skip: int = 0, limit: int = 100):
+    query = db.query(models.Orcamento).filter(models.Orcamento.status == StatusOrcamento.PENDENTE)
+    total = query.count()
+    items = (
+        query.options(
             joinedload(models.Orcamento.cliente),
             joinedload(models.Orcamento.funcionario),
             joinedload(models.Orcamento.itens).joinedload(models.ItemOrcamento.equipamento),
@@ -259,6 +276,235 @@ def recalcular_estoque_alugado(db: Session):
         ).scalar()
 
         eq.estoque_alugado = int(locacao_qtd or 0) + int(orcamento_qtd or 0)
+    db.commit()
+
+
+def _quantidade_alugada_equipamento(db: Session, equipamento_id: int) -> int:
+    from sqlalchemy import func
+
+    locacao_qtd = db.query(
+        func.coalesce(
+            func.sum(
+                models.ItemLocacao.quantidade - func.coalesce(models.ItemLocacao.quantidade_devolvida, 0)
+            ),
+            0,
+        )
+    ).join(models.Locacao).filter(
+        models.ItemLocacao.equipamento_id == equipamento_id,
+        models.Locacao.status.in_([StatusLocacao.ATIVA, StatusLocacao.ATRASADA]),
+    ).scalar()
+
+    orcamento_qtd = db.query(
+        func.coalesce(func.sum(models.ItemOrcamento.quantidade), 0)
+    ).join(models.Orcamento).outerjoin(
+        models.Locacao, models.Locacao.orcamento_id == models.Orcamento.id
+    ).filter(
+        models.ItemOrcamento.equipamento_id == equipamento_id,
+        models.Orcamento.status == StatusOrcamento.APROVADO,
+        models.Locacao.id.is_(None),
+    ).scalar()
+
+    return int(locacao_qtd or 0) + int(orcamento_qtd or 0)
+
+
+def get_equipamento_alocacoes(db: Session, equipamento_id: int):
+    db_equipamento = get_equipamento(db, equipamento_id)
+    if not db_equipamento:
+        return None
+
+    alocacoes = []
+
+    itens_locacao = (
+        db.query(models.ItemLocacao)
+        .join(models.Locacao)
+        .options(
+            joinedload(models.ItemLocacao.locacao).joinedload(models.Locacao.cliente),
+        )
+        .filter(
+            models.ItemLocacao.equipamento_id == equipamento_id,
+            models.Locacao.status.in_([StatusLocacao.ATIVA, StatusLocacao.ATRASADA]),
+        )
+        .all()
+    )
+    for item in itens_locacao:
+        pendente = item.quantidade - (item.quantidade_devolvida or 0)
+        if pendente <= 0:
+            continue
+        locacao = item.locacao
+        alocacoes.append({
+            "tipo": "locacao",
+            "id": locacao.id,
+            "cliente_id": locacao.cliente_id,
+            "cliente_nome": locacao.cliente.nome_razao_social if locacao.cliente else None,
+            "quantidade": item.quantidade,
+            "quantidade_pendente": pendente,
+            "status": locacao.status.value if hasattr(locacao.status, "value") else str(locacao.status),
+            "data_inicio": locacao.data_inicio,
+            "data_fim": locacao.data_fim,
+        })
+
+    itens_orcamento = (
+        db.query(models.ItemOrcamento)
+        .join(models.Orcamento)
+        .outerjoin(models.Locacao, models.Locacao.orcamento_id == models.Orcamento.id)
+        .options(
+            joinedload(models.ItemOrcamento.orcamento).joinedload(models.Orcamento.cliente),
+        )
+        .filter(
+            models.ItemOrcamento.equipamento_id == equipamento_id,
+            models.Orcamento.status == StatusOrcamento.APROVADO,
+            models.Locacao.id.is_(None),
+        )
+        .all()
+    )
+    for item in itens_orcamento:
+        orcamento = item.orcamento
+        alocacoes.append({
+            "tipo": "orcamento",
+            "id": orcamento.id,
+            "cliente_id": orcamento.cliente_id,
+            "cliente_nome": orcamento.cliente.nome_razao_social if orcamento.cliente else None,
+            "quantidade": item.quantidade,
+            "quantidade_pendente": item.quantidade,
+            "status": orcamento.status.value if hasattr(orcamento.status, "value") else str(orcamento.status),
+            "data_inicio": orcamento.data_inicio,
+            "data_fim": orcamento.data_fim,
+        })
+
+    return {
+        "equipamento_id": db_equipamento.id,
+        "descricao": db_equipamento.descricao,
+        "estoque": db_equipamento.estoque,
+        "estoque_alugado": db_equipamento.estoque_alugado,
+        "estoque_disponivel": db_equipamento.estoque - db_equipamento.estoque_alugado,
+        "alocacoes": alocacoes,
+    }
+
+
+def corrigir_estoque_equipamento(
+    db: Session,
+    equipamento_id: int,
+    estoque: int,
+    recalcular_alugado: bool = True,
+    estoque_alugado: Optional[int] = None,
+):
+    db_equipamento = get_equipamento(db, equipamento_id)
+    if not db_equipamento:
+        return None
+
+    db_equipamento.estoque = estoque
+    if recalcular_alugado:
+        db_equipamento.estoque_alugado = _quantidade_alugada_equipamento(db, equipamento_id)
+    elif estoque_alugado is not None:
+        db_equipamento.estoque_alugado = estoque_alugado
+
+    db.commit()
+    db.refresh(db_equipamento)
+    return db_equipamento
+
+
+def get_dashboard_resumo(db: Session):
+    from sqlalchemy import func, desc
+
+    totais = {
+        "clientes": db.query(func.count(models.Cliente.id)).scalar() or 0,
+        "equipamentos": db.query(func.count(models.Equipamento.id)).scalar() or 0,
+        "orcamentos": db.query(func.count(models.Orcamento.id)).scalar() or 0,
+        "locacoes_ativas": db.query(func.count(models.Locacao.id)).filter(
+            models.Locacao.status.in_([StatusLocacao.ATIVA, StatusLocacao.ATRASADA])
+        ).scalar() or 0,
+    }
+
+    orcamentos_pendentes = (
+        db.query(models.Orcamento)
+        .options(
+            joinedload(models.Orcamento.cliente),
+            joinedload(models.Orcamento.funcionario),
+            joinedload(models.Orcamento.itens).joinedload(models.ItemOrcamento.equipamento),
+        )
+        .filter(models.Orcamento.status == StatusOrcamento.PENDENTE)
+        .order_by(models.Orcamento.id.desc())
+        .limit(8)
+        .all()
+    )
+
+    locacoes_ativas = (
+        db.query(models.Locacao)
+        .options(
+            joinedload(models.Locacao.cliente),
+            joinedload(models.Locacao.itens).joinedload(models.ItemLocacao.equipamento),
+        )
+        .filter(models.Locacao.status.in_([StatusLocacao.ATIVA, StatusLocacao.ATRASADA]))
+        .order_by(models.Locacao.id.desc())
+        .all()
+    )
+
+    top_eq_rows = (
+        db.query(
+            models.Equipamento.descricao,
+            func.coalesce(func.sum(models.ItemLocacao.quantidade), 0).label("totalLocacoes"),
+            func.coalesce(func.sum(models.ItemLocacao.dias), 0).label("totalDias"),
+        )
+        .join(models.ItemLocacao, models.ItemLocacao.equipamento_id == models.Equipamento.id)
+        .join(models.Locacao, models.Locacao.id == models.ItemLocacao.locacao_id)
+        .filter(models.Locacao.status != StatusLocacao.CANCELADA)
+        .group_by(models.Equipamento.id, models.Equipamento.descricao)
+        .order_by(desc("totalLocacoes"))
+        .limit(5)
+        .all()
+    )
+    top_equipamentos = [
+        {"nome": row.descricao, "totalLocacoes": int(row.totalLocacoes or 0), "totalDias": int(row.totalDias or 0)}
+        for row in top_eq_rows
+    ]
+
+    top_cli_rows = (
+        db.query(
+            models.Cliente.nome_razao_social,
+            func.count(models.Locacao.id).label("totalLocacoes"),
+            func.coalesce(func.sum(models.Locacao.total_final), 0).label("totalValor"),
+        )
+        .join(models.Locacao, models.Locacao.cliente_id == models.Cliente.id)
+        .filter(models.Locacao.status != StatusLocacao.CANCELADA)
+        .group_by(models.Cliente.id, models.Cliente.nome_razao_social)
+        .order_by(desc("totalValor"))
+        .limit(5)
+        .all()
+    )
+    top_clientes = [
+        {
+            "nome": row.nome_razao_social,
+            "totalLocacoes": int(row.totalLocacoes or 0),
+            "totalValor": float(row.totalValor or 0),
+        }
+        for row in top_cli_rows
+    ]
+
+    locacoes_faturamento = db.query(
+        models.Locacao.id,
+        models.Locacao.data_criacao,
+        models.Locacao.status,
+        models.Locacao.total_final,
+        models.Locacao.cliente_id,
+    ).all()
+
+    return {
+        "totais": totais,
+        "orcamentos_pendentes": orcamentos_pendentes,
+        "locacoes_ativas": locacoes_ativas,
+        "top_equipamentos": top_equipamentos,
+        "top_clientes": top_clientes,
+        "locacoes_faturamento": [
+            {
+                "id": row.id,
+                "data_criacao": row.data_criacao,
+                "status": row.status,
+                "total_final": row.total_final,
+                "cliente_id": row.cliente_id,
+            }
+            for row in locacoes_faturamento
+        ],
+    }
 
 
 def create_orcamento(db: Session, orcamento: schemas.OrcamentoCreate):

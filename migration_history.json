@@ -4,5 +4,6 @@
     "migrate_locacoes_desconto.py",
     "migrate_renovacoes.py",
     "migrate_tipo_cobranca_item_locacao.py",
-    "migrate_funcionario_senha_consulta.py"
+    "migrate_funcionario_senha_consulta.py",
+    "migrate_estoque_somente_aprovado.py"
 ]
