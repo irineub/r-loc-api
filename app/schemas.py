@@ -1,7 +1,10 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, TypeVar, Generic
+from pydantic import BaseModel, Field, BeforeValidator
+from typing import Annotated, Optional, List, TypeVar, Generic
 from datetime import datetime
 from app.models import TipoPessoa, TipoCobranca, StatusOrcamento, StatusLocacao
+
+# Colunas FLOAT com default 0.0 ainda podem ser NULL em registros antigos.
+FloatZero = Annotated[float, BeforeValidator(lambda v: 0.0 if v is None else v)]
 
 # Cliente Schemas
 class ClienteBase(BaseModel):
@@ -97,9 +100,9 @@ class OrcamentoBase(BaseModel):
     cliente_id: int
     data_inicio: datetime
     data_fim: datetime
-    desconto: float = Field(default=0.0, ge=0)
-    desconto_percentual: float = Field(default=0.0, ge=0, le=100)
-    frete: float = Field(default=0.0, ge=0)
+    desconto: FloatZero = Field(default=0.0, ge=0)
+    desconto_percentual: FloatZero = Field(default=0.0, ge=0, le=100)
+    frete: FloatZero = Field(default=0.0, ge=0)
     total_final: float = Field(..., ge=0)
     observacoes: Optional[str] = None
     funcionario_id: Optional[int] = None
